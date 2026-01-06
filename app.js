@@ -69,6 +69,11 @@ function setupEventListeners() {
         elements.progressContainer.style.display = 'none';
     });
 
+    document.getElementById('backToHome').addEventListener('click', () => {
+        showView('home');
+        elements.progressContainer.style.display = 'none';
+    });
+
     // Quiz buttons
     elements.confirmButton.addEventListener('click', handleConfirm);
     elements.prevButton.addEventListener('click', goToPreviousQuestion);
