@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="App per lo studio con domande a scelta multipla">
+    <title>Multiple Choice Study App</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1 class="logo">📚 Study Hub</h1>
+            <div class="progress-container" id="progressContainer" style="display: none;">
+                <div class="progress-text" id="progressText">Domanda 1 di 10</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Home View: Course Selection -->
+        <div id="homeView" class="view active">
+            <div class="view-header">
+                <h2>Scegli un Corso</h2>
+                <p>Seleziona il corso per iniziare a studiare</p>
+                <button class="btn btn-import" id="importButton">📥 Importa Quiz</button>
+            </div>
+            <div id="courseList" class="card-grid"></div>
+        </div>
+
+        <!-- Deck Selection View -->
+        <div id="deckView" class="view">
+            <div class="view-header">
+                <button class="back-button" id="backToCourses">← Torna ai Corsi</button>
+                <h2 id="courseTitle">Digital Communications</h2>
+                <p>Scegli un deck di domande</p>
+            </div>
+            <div id="deckList" class="card-grid"></div>
+        </div>
+
+        <!-- Quiz View -->
+        <div id="quizView" class="view">
+            <div class="quiz-container">
+                <div class="quiz-header">
+                    <button class="back-button" id="backToDecks">← Torna ai Deck</button>
+                    <div class="quiz-info">
+                        <span id="quizDeckName">Appendix Questions</span>
+                        <span class="score" id="scoreDisplay">Punteggio: 0/0</span>
+                    </div>
+                </div>
+
+                <div class="question-card" id="questionCard">
+                    <div class="question-text" id="questionText"></div>
+                    <div class="answers-container" id="answersContainer"></div>
+
+                    <div class="feedback" id="feedback" style="display: none;">
+                        <div class="feedback-icon" id="feedbackIcon"></div>
+                        <div class="feedback-text" id="feedbackText"></div>
+                    </div>
+
+                    <div class="quiz-actions">
+                        <button class="btn btn-secondary" id="prevButton">← Precedente</button>
+                        <button class="btn btn-primary" id="confirmButton">Conferma</button>
+                        <button class="btn btn-secondary" id="nextQuestionButton">Prossima →</button>
+                        <button class="btn btn-primary" id="finishButton" style="display: none;">Termina Quiz</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results View -->
+        <div id="resultsView" class="view">
+            <div class="results-container">
+                <div class="results-icon">🎉</div>
+                <h2>Quiz Completato!</h2>
+                <div class="results-score">
+                    <div class="score-big" id="finalScore">0/0</div>
+                    <div class="score-percentage" id="scorePercentage">0%</div>
+                </div>
+                <div class="results-message" id="resultsMessage"></div>
+                <div class="results-actions">
+                    <button class="btn btn-primary" id="restartQuiz">Ricomincia Quiz</button>
+                    <button class="btn btn-secondary" id="backToDecksFromResults">Scegli Altro Deck</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import Modal -->
+        <div id="importModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Importa Nuovo Quiz</h3>
+                    <button class="modal-close" id="closeImportModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="importForm">
+                        <div class="form-group">
+                            <label for="courseSelect">Seleziona Corso</label>
+                            <select id="courseSelect" required>
+                                <option value="">-- Seleziona un corso esistente --</option>
+                                <option value="__new__">+ Crea nuovo corso</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="newCourseGroup" style="display: none;">
+                            <label for="courseName">Nome Nuovo Corso</label>
+                            <input type="text" id="courseName" placeholder="es. Sistemi Operativi">
+                        </div>
+                        <div class="form-group">
+                            <label for="deckName">Nome Deck</label>
+                            <input type="text" id="deckName" placeholder="es. Chapter 2" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="quizFile">File Quiz (.txt o .csv)</label>
+                            <input type="file" id="quizFile" accept=".txt,.csv" required>
+                            <small class="form-help">
+                                Formato .txt: Domanda;Risposta1;Risposta2;Risposta3;Risposta4;;ID<br>
+                                La prima risposta è quella corretta.
+                            </small>
+                        </div>
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-secondary" id="cancelImport">Annulla</button>
+                            <button type="submit" class="btn btn-primary">Importa</button>
+                        </div>
+                    </form>
+                    <div id="importStatus" class="import-status" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include MathJax for LaTeX rendering -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['\\(', '\\)']],
+                displayMath: [['\\[', '\\]']]
+            },
+            svg: {
+                fontCache: 'global'
+            }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+    <!-- Application Scripts -->
+    <script src="data.js"></script>
+    <script src="parser.js"></script>
+    <script src="storage.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
