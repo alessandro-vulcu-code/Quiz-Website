@@ -640,19 +640,46 @@ function deleteDeck(courseName, deckName) {
 
 // ===== Code Generator Functions =====
 function generateDataCode() {
-    // Get all data (hard-coded + imported)
-    const allData = StorageManager.loadAllData();
+    console.log('generateDataCode called');
 
-    // Generate JavaScript code
-    const code = `// Question data for Multiple Choice Study App
+    try {
+        // Get all data (hard-coded + imported)
+        const allData = StorageManager.loadAllData();
+        console.log('Data loaded:', allData);
+
+        // Generate JavaScript code
+        const code = `// Question data for Multiple Choice Study App
 // This file contains all courses, decks, and questions
 
 const STUDY_DATA = ${JSON.stringify(allData, null, 4)};
 `;
 
-    // Show in modal
-    document.getElementById('generatedCode').value = code;
-    document.getElementById('codeModal').classList.add('active');
+        console.log('Code generated, length:', code.length);
+
+        // Show in modal
+        const codeTextarea = document.getElementById('generatedCode');
+        const codeModal = document.getElementById('codeModal');
+
+        if (!codeTextarea) {
+            console.error('generatedCode textarea not found!');
+            alert('Errore: elemento generatedCode non trovato');
+            return;
+        }
+
+        if (!codeModal) {
+            console.error('codeModal not found!');
+            alert('Errore: elemento codeModal non trovato');
+            return;
+        }
+
+        codeTextarea.value = code;
+        codeModal.classList.add('active');
+        console.log('Modal should be visible now');
+
+    } catch (error) {
+        console.error('Error in generateDataCode:', error);
+        alert('Errore durante la generazione del codice: ' + error.message);
+    }
 }
 
 function closeCodeModal() {
