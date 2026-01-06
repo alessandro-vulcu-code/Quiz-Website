@@ -17,9 +17,7 @@ function showResults() {
     // Set congratulatory message
     let message = '', icon = '';
     if (percentage === 100) {
-        message = '🌟 Perfetto! Hai risposto correct
-
-tamente a tutte le domande!';
+        message = '🌟 Perfetto! Hai risposto correttamente a tutte le domande!';
         icon = '🎉';
     } else if (percentage >= 80) {
         message = '🎊 Ottimo lavoro! Hai una buona padronanza dell\'argomento!';

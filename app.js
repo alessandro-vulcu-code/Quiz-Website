@@ -69,10 +69,13 @@ function setupEventListeners() {
         elements.progressContainer.style.display = 'none';
     });
 
-    document.getElementById('backToHome').addEventListener('click', () => {
-        showView('home');
-        elements.progressContainer.style.display = 'none';
-    });
+    const backToHomeBtn = document.getElementById('backToHome');
+    if (backToHomeBtn) {
+        backToHomeBtn.addEventListener('click', () => {
+            showView('home');
+            elements.progressContainer.style.display = 'none';
+        });
+    }
 
     // Quiz buttons
     elements.confirmButton.addEventListener('click', handleConfirm);
@@ -480,8 +483,84 @@ function showResults() {
     elements.resultsMessage.textContent = message;
     document.querySelector('.results-icon').textContent = icon;
 
+    // Generate detailed review
+    generateReview();
+
     elements.progressContainer.style.display = 'none';
     showView('results');
+}
+
+function generateReview() {
+    const reviewContainer = document.getElementById('reviewContainer');
+    if (!reviewContainer) {
+        console.error('reviewContainer not found!');
+        return;
+    }
+
+    reviewContainer.innerHTML = '';
+
+    shuffledQuestions.forEach((question, index) => {
+        const userAnswer = userAnswers[index];
+        const isCorrect = userAnswer && userAnswer.isCorrect;
+
+        const reviewCard = document.createElement('div');
+        reviewCard.className = `review-card ${isCorrect ? 'correct' : 'incorrect'}`;
+
+        // Question header
+        const questionHeader = document.createElement('div');
+        questionHeader.className = 'review-question-header';
+        questionHeader.innerHTML = `
+            <span class="review-number">Domanda ${index + 1}</span>
+            <span class="review-status">${isCorrect ? '✓ Corretta' : '✗ Sbagliata'}</span>
+        `;
+        reviewCard.appendChild(questionHeader);
+
+        // Question text
+        const questionText = document.createElement('div');
+        questionText.className = 'review-question-text';
+        questionText.innerHTML = convertMarkdownToHtml(question.question);
+        reviewCard.appendChild(questionText);
+
+        // Answers
+        const answersContainer = document.createElement('div');
+        answersContainer.className = 'review-answers';
+
+        question.answers.forEach((answer, answerIndex) => {
+            const isUserAnswer = userAnswer && userAnswer.selectedIndex === answerIndex;
+            const isCorrectAnswer = answerIndex === question.correctIndex;
+
+            const answerDiv = document.createElement('div');
+            answerDiv.className = 'review-answer';
+
+            if (isCorrectAnswer) {
+                answerDiv.classList.add('correct-answer');
+            }
+            if (isUserAnswer && !isCorrectAnswer) {
+                answerDiv.classList.add('wrong-answer');
+            }
+            if (isUserAnswer) {
+                answerDiv.classList.add('user-answer');
+            }
+
+            let prefix = '';
+            if (isCorrectAnswer) {
+                prefix = '✓ ';
+            } else if (isUserAnswer) {
+                prefix = '✗ ';
+            }
+
+            answerDiv.innerHTML = prefix + convertMarkdownToHtml(answer);
+            answersContainer.appendChild(answerDiv);
+        });
+
+        reviewCard.appendChild(answersContainer);
+        reviewContainer.appendChild(reviewCard);
+    });
+
+    // Trigger MathJax rendering
+    if (window.MathJax) {
+        MathJax.typesetPromise([reviewContainer]);
+    }
 }
 
 // ===== Import Modal Functions =====
