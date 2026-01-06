@@ -83,6 +83,11 @@ function setupEventListeners() {
     document.getElementById('closeImportModal').addEventListener('click', closeImportModal);
     document.getElementById('cancelImport').addEventListener('click', closeImportModal);
     document.getElementById('importForm').addEventListener('submit', handleImportSubmit);
+
+    // Code generator handlers
+    document.getElementById('generateCodeButton').addEventListener('click', generateDataCode);
+    document.getElementById('closeCodeModal').addEventListener('click', closeCodeModal);
+    document.getElementById('copyCodeButton').addEventListener('click', copyGeneratedCode);
 }
 
 // ===== Course & Deck Rendering =====
@@ -630,6 +635,50 @@ function deleteDeck(courseName, deckName) {
         alert(`Deck "${deckName}" eliminato con successo!`);
     } else {
         alert('Errore durante l\'eliminazione del deck.');
+    }
+}
+
+// ===== Code Generator Functions =====
+function generateDataCode() {
+    // Get all data (hard-coded + imported)
+    const allData = StorageManager.loadAllData();
+
+    // Generate JavaScript code
+    const code = `// Question data for Multiple Choice Study App
+// This file contains all courses, decks, and questions
+
+const STUDY_DATA = ${JSON.stringify(allData, null, 4)};
+`;
+
+    // Show in modal
+    document.getElementById('generatedCode').value = code;
+    document.getElementById('codeModal').classList.add('active');
+}
+
+function closeCodeModal() {
+    document.getElementById('codeModal').classList.remove('active');
+}
+
+function copyGeneratedCode() {
+    const codeTextarea = document.getElementById('generatedCode');
+    codeTextarea.select();
+    codeTextarea.setSelectionRange(0, 99999); // For mobile
+
+    try {
+        document.execCommand('copy');
+
+        // Change button text temporarily
+        const copyBtn = document.getElementById('copyCodeButton');
+        const originalText = copyBtn.textContent;
+        copyBtn.textContent = '✅ Copiato!';
+        copyBtn.style.background = 'var(--success)';
+
+        setTimeout(() => {
+            copyBtn.textContent = originalText;
+            copyBtn.style.background = '';
+        }, 2000);
+    } catch (err) {
+        alert('Impossibile copiare automaticamente. Seleziona tutto il testo e copia manualmente (Ctrl+C / Cmd+C)');
     }
 }
 

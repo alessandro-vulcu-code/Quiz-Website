@@ -132,6 +132,18 @@ body {
     font-size: 1.125rem;
 }
 
+.button-group {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.button-group .btn {
+    flex: 0 1 auto;
+}
+
 /* ===== Cards ===== */
 .card-grid {
     display: grid;

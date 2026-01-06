@@ -27,7 +27,11 @@
             <div class="view-header">
                 <h2>Scegli un Corso</h2>
                 <p>Seleziona il corso per iniziare a studiare</p>
-                <button class="btn btn-import" id="importButton">📥 Importa Quiz</button>
+                <div class="button-group">
+                    <button class="btn btn-import" id="importButton">📥 Importa Quiz</button>
+                    <button class="btn btn-secondary" id="generateCodeButton" title="Genera codice per data.js">🔧
+                        Genera Codice per GitHub</button>
+                </div>
             </div>
             <div id="courseList" class="card-grid"></div>
         </div>
@@ -127,6 +131,53 @@
                         </div>
                     </form>
                     <div id="importStatus" class="import-status" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Code Generator Modal -->
+        <div id="codeModal" class="modal">
+            <div class="modal-content" style="max-width: 900px;">
+                <div class="modal-header">
+                    <h3>Codice data.js Generato</h3>
+                    <button class="modal-close" id="closeCodeModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="margin-bottom: 1rem; color: var(--text-secondary);">
+                        📋 <strong>Istruzioni:</strong>
+                    </p>
+                    <ol style="margin-bottom: 1.5rem; color: var(--text-secondary); line-height: 1.8;">
+                        <li>Copia tutto il codice qui sotto</li>
+                        <li>Apri il file <code>data.js</code> del tuo progetto</li>
+                        <li>Sostituisci TUTTO il contenuto con questo codice</li>
+                        <li>Salva il file</li>
+                        <li>Fai commit e push su GitHub:
+                            <pre
+                                style="background: var(--bg-secondary); padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem;">git add data.js
+git commit -m "Update quiz data"
+git push</pre>
+                        </li>
+                        <li>Aspetta 1-2 minuti che GitHub Pages si aggiorni</li>
+                        <li>✅ Tutti vedranno i quiz su tutti i dispositivi!</li>
+                    </ol>
+                    <div style="position: relative;">
+                        <button class="btn btn-primary" id="copyCodeButton"
+                            style="position: absolute; top: 0.5rem; right: 0.5rem; z-index: 10;">
+                            📋 Copia Codice
+                        </button>
+                        <textarea id="generatedCode" readonly style="
+                            width: 100%;
+                            height: 400px;
+                            background: var(--bg-secondary);
+                            color: var(--text-primary);
+                            border: 2px solid var(--bg-hover);
+                            border-radius: var(--border-radius-sm);
+                            padding: 1rem;
+                            font-family: 'Courier New', monospace;
+                            font-size: 0.875rem;
+                            resize: vertical;
+                        "></textarea>
+                    </div>
                 </div>
             </div>
         </div>
