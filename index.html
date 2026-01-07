@@ -42,6 +42,8 @@
                 <button class="back-button" id="backToCourses">← Torna ai Corsi</button>
                 <h2 id="courseTitle">Digital Communications</h2>
                 <p>Scegli un deck di domande</p>
+                <button class="btn btn-primary" id="addQuestionsButton" style="margin-top: 1rem;">➕ Aggiungi
+                    Domande</button>
             </div>
             <div id="deckList" class="card-grid"></div>
         </div>
@@ -137,6 +139,98 @@
                         </div>
                     </form>
                     <div id="importStatus" class="import-status" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Questions Modal -->
+        <div id="addQuestionsModal" class="modal">
+            <div class="modal-content" style="max-width: 700px;">
+                <div class="modal-header">
+                    <h3>➕ Aggiungi Domande al Deck</h3>
+                    <button class="modal-close" id="closeAddQuestionsModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <!-- Deck Selection -->
+                    <div class="form-group">
+                        <label for="targetDeckSelect">Seleziona Deck di Destinazione</label>
+                        <select id="targetDeckSelect" required>
+                            <option value="">-- Seleziona un deck --</option>
+                        </select>
+                    </div>
+
+                    <!-- Tab Navigation -->
+                    <div class="tab-navigation">
+                        <button class="tab-button active" data-tab="manual">✍️ Manuale</button>
+                        <button class="tab-button" data-tab="import">📥 Importa File</button>
+                    </div>
+
+                    <!-- Manual Entry Tab -->
+                    <div id="manualTab" class="tab-content active">
+                        <form id="manualQuestionForm">
+                            <div class="form-group">
+                                <label for="questionText">Domanda *</label>
+                                <textarea id="questionText" rows="3" placeholder="Inserisci la domanda..."
+                                    required></textarea>
+                                <small class="form-help">Puoi usare LaTeX: \( formula \) o \[ formula \]</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Risposte *</label>
+                                <div class="answers-input">
+                                    <div class="answer-item">
+                                        <input type="text" id="answer0" placeholder="Risposta 1" required>
+                                        <input type="radio" name="correctAnswer" value="0" checked>
+                                        <label>Corretta</label>
+                                    </div>
+                                    <div class="answer-item">
+                                        <input type="text" id="answer1" placeholder="Risposta 2" required>
+                                        <input type="radio" name="correctAnswer" value="1">
+                                        <label>Corretta</label>
+                                    </div>
+                                    <div class="answer-item">
+                                        <input type="text" id="answer2" placeholder="Risposta 3" required>
+                                        <input type="radio" name="correctAnswer" value="2">
+                                        <label>Corretta</label>
+                                    </div>
+                                    <div class="answer-item">
+                                        <input type="text" id="answer3" placeholder="Risposta 4" required>
+                                        <input type="radio" name="correctAnswer" value="3">
+                                        <label>Corretta</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="modal-actions">
+                                <button type="button" class="btn btn-secondary" id="cancelManualAdd">Annulla</button>
+                                <button type="submit" class="btn btn-primary">✅ Aggiungi Domanda</button>
+                            </div>
+                        </form>
+
+                        <div id="manualAddStatus" class="import-status" style="display: none; margin-top: 1rem;"></div>
+                    </div>
+
+                    <!-- Import Tab -->
+                    <div id="importTab" class="tab-content">
+                        <form id="importQuestionsForm">
+                            <div class="form-group">
+                                <label for="questionsFile">File Domande (.txt o .csv) *</label>
+                                <input type="file" id="questionsFile" accept=".txt,.csv" required>
+                                <small class="form-help">
+                                    Formato .txt: Domanda;Risposta1;Risposta2;Risposta3;Risposta4;;ID<br>
+                                    Formato .csv: domanda,risposta1,risposta2,risposta3,risposta4,correctIndex<br>
+                                    La prima risposta è quella corretta (o specifica correctIndex nel CSV).
+                                </small>
+                            </div>
+
+                            <div class="modal-actions">
+                                <button type="button" class="btn btn-secondary" id="cancelImportAdd">Annulla</button>
+                                <button type="submit" class="btn btn-primary">📥 Importa Domande</button>
+                            </div>
+                        </form>
+
+                        <div id="importAddStatus" class="import-status" style="display: none; margin-top: 1rem;"></div>
+                    </div>
                 </div>
             </div>
         </div>

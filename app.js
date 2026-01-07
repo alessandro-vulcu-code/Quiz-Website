@@ -96,6 +96,22 @@ function setupEventListeners() {
     document.getElementById('generateCodeButton').addEventListener('click', generateDataCode);
     document.getElementById('closeCodeModal').addEventListener('click', closeCodeModal);
     document.getElementById('copyCodeButton').addEventListener('click', copyGeneratedCode);
+
+    // Add questions modal handlers
+    document.getElementById('addQuestionsButton').addEventListener('click', openAddQuestionsModal);
+    document.getElementById('closeAddQuestionsModal').addEventListener('click', closeAddQuestionsModal);
+    document.getElementById('cancelManualAdd').addEventListener('click', closeAddQuestionsModal);
+    document.getElementById('cancelImportAdd').addEventListener('click', closeAddQuestionsModal);
+    document.getElementById('manualQuestionForm').addEventListener('submit', handleManualQuestionSubmit);
+    document.getElementById('importQuestionsForm').addEventListener('submit', handleImportQuestionsSubmit);
+
+    // Tab navigation for add questions modal
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const tabName = e.target.dataset.tab;
+            switchTab(tabName);
+        });
+    });
 }
 
 // ===== Course & Deck Rendering =====
@@ -697,6 +713,214 @@ function populateCourseSelect() {
             courseNameInput.required = false;
         }
     };
+}
+
+// ===== Add Questions Modal Functions =====
+function openAddQuestionsModal() {
+    if (!currentCourse) {
+        alert('Seleziona prima un corso!');
+        return;
+    }
+
+    const modal = document.getElementById('addQuestionsModal');
+    modal.classList.add('active');
+
+    // Reset forms
+    document.getElementById('manualQuestionForm').reset();
+    document.getElementById('importQuestionsForm').reset();
+    document.getElementById('manualAddStatus').style.display = 'none';
+    document.getElementById('importAddStatus').style.display = 'none';
+
+    // Populate deck select
+    populateTargetDeckSelect();
+
+    // Switch to manual tab by default
+    switchTab('manual');
+}
+
+function closeAddQuestionsModal() {
+    const modal = document.getElementById('addQuestionsModal');
+    modal.classList.remove('active');
+}
+
+function switchTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.tab === tabName) {
+            btn.classList.add('active');
+        }
+    });
+
+    // Update tab content
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+
+    if (tabName === 'manual') {
+        document.getElementById('manualTab').classList.add('active');
+    } else if (tabName === 'import') {
+        document.getElementById('importTab').classList.add('active');
+    }
+}
+
+function populateTargetDeckSelect() {
+    const deckSelect = document.getElementById('targetDeckSelect');
+    deckSelect.innerHTML = '<option value="">-- Seleziona un deck --</option>';
+
+    // Get all decks for current course
+    const decks = StorageManager.getAllDecksForCourse(currentCourse);
+
+    // Only show imported decks (we can only add to imported decks)
+    const importedDecks = decks.filter(deck => deck.imported);
+
+    if (importedDecks.length === 0) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = '(Nessun deck importato disponibile - crea prima un deck)';
+        option.disabled = true;
+        deckSelect.appendChild(option);
+        return;
+    }
+
+    importedDecks.forEach(deck => {
+        const option = document.createElement('option');
+        option.value = deck.name;
+        option.textContent = `${deck.name} (${deck.questions.length} domande)`;
+        deckSelect.appendChild(option);
+    });
+}
+
+async function handleManualQuestionSubmit(event) {
+    event.preventDefault();
+
+    const deckName = document.getElementById('targetDeckSelect').value;
+    if (!deckName) {
+        showAddStatus('Seleziona un deck di destinazione', 'error', 'manual');
+        return;
+    }
+
+    // Get form data
+    const questionText = document.getElementById('questionText').value.trim();
+    const answers = [
+        document.getElementById('answer0').value.trim(),
+        document.getElementById('answer1').value.trim(),
+        document.getElementById('answer2').value.trim(),
+        document.getElementById('answer3').value.trim()
+    ];
+    const correctIndex = parseInt(document.querySelector('input[name="correctAnswer"]:checked').value);
+
+    // Validate
+    if (!questionText) {
+        showAddStatus('Inserisci il testo della domanda', 'error', 'manual');
+        return;
+    }
+
+    if (answers.some(a => !a)) {
+        showAddStatus('Inserisci tutte e 4 le risposte', 'error', 'manual');
+        return;
+    }
+
+    // Create question object
+    const newQuestion = {
+        question: questionText,
+        answers: answers,
+        correctIndex: correctIndex
+    };
+
+    try {
+        // Add to storage
+        const totalQuestions = StorageManager.addQuestionsToDeck(currentCourse, deckName, [newQuestion]);
+
+        // Reload app data
+        appData = StorageManager.loadAllData();
+
+        // Re-render decks if we're in deck view
+        if (currentCourse) {
+            renderDecks();
+        }
+
+        // Show success
+        showAddStatus(`✓ Domanda aggiunta! Il deck ora ha ${totalQuestions} domande.`, 'success', 'manual');
+
+        // Reset form
+        document.getElementById('manualQuestionForm').reset();
+
+        // Close modal after delay
+        setTimeout(() => {
+            closeAddQuestionsModal();
+        }, 2000);
+
+    } catch (error) {
+        console.error('Error adding question:', error);
+        showAddStatus(`Errore: ${error.message}`, 'error', 'manual');
+    }
+}
+
+async function handleImportQuestionsSubmit(event) {
+    event.preventDefault();
+
+    const deckName = document.getElementById('targetDeckSelect').value;
+    if (!deckName) {
+        showAddStatus('Seleziona un deck di destinazione', 'error', 'import');
+        return;
+    }
+
+    const fileInput = document.getElementById('questionsFile');
+    if (!fileInput.files || fileInput.files.length === 0) {
+        showAddStatus('Seleziona un file', 'error', 'import');
+        return;
+    }
+
+    const file = fileInput.files[0];
+
+    try {
+        // Read file content
+        const fileContent = await readFileAsText(file);
+
+        // Parse file
+        const questions = FileParser.parseFile(fileContent, file.name);
+
+        // Validate questions
+        const validation = FileParser.validateQuestions(questions);
+        if (!validation.valid) {
+            showAddStatus(`Errore: ${validation.error}`, 'error', 'import');
+            return;
+        }
+
+        // Add to storage
+        const totalQuestions = StorageManager.addQuestionsToDeck(currentCourse, deckName, questions);
+
+        // Reload app data
+        appData = StorageManager.loadAllData();
+
+        // Re-render decks if we're in deck view
+        if (currentCourse) {
+            renderDecks();
+        }
+
+        // Show success
+        showAddStatus(`✓ Importate ${validation.questionCount} domande! Il deck ora ha ${totalQuestions} domande.`, 'success', 'import');
+
+        // Reset form
+        document.getElementById('importQuestionsForm').reset();
+
+        // Close modal after delay
+        setTimeout(() => {
+            closeAddQuestionsModal();
+        }, 2000);
+
+    } catch (error) {
+        console.error('Import error:', error);
+        showAddStatus(`Errore: ${error.message}`, 'error', 'import');
+    }
+}
+
+function showAddStatus(message, type, tab) {
+    const statusDiv = document.getElementById(`${tab}AddStatus`);
+    statusDiv.textContent = message;
+    statusDiv.className = `import-status ${type}`;
+    statusDiv.style.display = 'block';
 }
 
 // ===== Delete Functions =====

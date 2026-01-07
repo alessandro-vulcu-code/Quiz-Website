@@ -170,5 +170,44 @@ const StorageManager = {
             console.error('Error importing data:', error);
             return false;
         }
+    },
+
+    /**
+     * Add questions to an existing deck
+     */
+    addQuestionsToDeck(courseName, deckName, newQuestions) {
+        const importedData = this.getImportedData();
+
+        // Check if course exists
+        if (!importedData[courseName]) {
+            throw new Error(`Corso "${courseName}" non trovato`);
+        }
+
+        // Find the deck
+        const deckIndex = importedData[courseName].decks.findIndex(
+            deck => deck.name === deckName
+        );
+
+        if (deckIndex < 0) {
+            throw new Error(`Deck "${deckName}" non trovato nel corso "${courseName}"`);
+        }
+
+        // Add questions to existing deck
+        importedData[courseName].decks[deckIndex].questions.push(...newQuestions);
+        importedData[courseName].decks[deckIndex].importDate = new Date().toISOString();
+
+        this.setImportedData(importedData);
+        return importedData[courseName].decks[deckIndex].questions.length;
+    },
+
+    /**
+     * Get all decks for a specific course (from both hard-coded and imported data)
+     */
+    getAllDecksForCourse(courseName) {
+        const allData = this.loadAllData();
+        if (!allData.courses[courseName]) {
+            return [];
+        }
+        return allData.courses[courseName].decks || [];
     }
 };
