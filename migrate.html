@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Migrazione Dati a Supabase</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .log {
+            background: #f0f0f0;
+            padding: 1rem;
+            border-radius: 4px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            margin-top: 1rem;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+        }
+
+        .error {
+            color: red;
+        }
+
+        .success {
+            color: green;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Strumento di Migrazione Dati</h1>
+    <p>Questo strumento caricherà i dati presenti in <code>data.js</code> nel tuo database Supabase.</p>
+    <p><strong>Attenzione:</strong> Assicurati che le tabelle siano vuote o potresti creare duplicati.</p>
+
+    <button id="startBtn" class="btn">Avvia Migrazione</button>
+
+    <div id="log" class="log"></div>
+
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Configurazione Supabase -->
+    <script src="supabase-client.js"></script>
+
+    <!-- Dati Locali -->
+    <script src="data.js"></script>
+
+    <!-- Script di Migrazione -->
+    <script src="migrate.js"></script>
+</body>
+
+</html>

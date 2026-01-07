@@ -46,9 +46,13 @@ function showView(viewName) {
 }
 
 // ===== Initialization =====
-function init() {
-    // Load all data (hard-coded + imported)
-    appData = StorageManager.loadAllData();
+async function init() {
+    // Show loading state (optional, but good practice)
+    const courseList = document.getElementById('courseList');
+    if (courseList) courseList.innerHTML = '<div class="loading">Caricamento corsi...</div>';
+
+    // Load all data (Supabase + imported)
+    appData = await StorageManager.loadAllData();
     renderCourses();
     setupEventListeners();
 }
@@ -643,10 +647,10 @@ async function handleImportSubmit(event) {
         }
 
         // Save to storage
-        StorageManager.saveQuizData(courseName, deckName, questions);
+        await StorageManager.saveQuizData(courseName, deckName, questions);
 
         // Reload app data
-        appData = StorageManager.loadAllData();
+        appData = await StorageManager.loadAllData();
 
         // Re-render courses
         renderCourses();
@@ -764,12 +768,12 @@ function switchTab(tabName) {
     }
 }
 
-function populateTargetDeckSelect() {
+async function populateTargetDeckSelect() {
     const deckSelect = document.getElementById('targetDeckSelect');
     deckSelect.innerHTML = '<option value="">-- Seleziona un deck --</option>';
 
     // Get all decks for current course
-    const decks = StorageManager.getAllDecksForCourse(currentCourse);
+    const decks = await StorageManager.getAllDecksForCourse(currentCourse);
 
     // Only show imported decks (we can only add to imported decks)
     const importedDecks = decks.filter(deck => deck.imported);
@@ -830,15 +834,19 @@ async function handleManualQuestionSubmit(event) {
 
     try {
         // Add to storage
-        const totalQuestions = StorageManager.addQuestionsToDeck(currentCourse, deckName, [newQuestion]);
+        await StorageManager.addQuestionsToDeck(currentCourse, deckName, [newQuestion]);
 
         // Reload app data
-        appData = StorageManager.loadAllData();
+        appData = await StorageManager.loadAllData();
 
         // Re-render decks if we're in deck view
         if (currentCourse) {
             renderDecks();
         }
+
+        // Get new total count
+        const updatedDeck = appData.courses[currentCourse].decks.find(d => d.name === deckName);
+        const totalQuestions = updatedDeck ? updatedDeck.questions.length : 'N/A';
 
         // Show success
         showAddStatus(`✓ Domanda aggiunta! Il deck ora ha ${totalQuestions} domande.`, 'success', 'manual');
@@ -889,15 +897,19 @@ async function handleImportQuestionsSubmit(event) {
         }
 
         // Add to storage
-        const totalQuestions = StorageManager.addQuestionsToDeck(currentCourse, deckName, questions);
+        await StorageManager.addQuestionsToDeck(currentCourse, deckName, questions);
 
         // Reload app data
-        appData = StorageManager.loadAllData();
+        appData = await StorageManager.loadAllData();
 
         // Re-render decks if we're in deck view
         if (currentCourse) {
             renderDecks();
         }
+
+        // Get new total count
+        const updatedDeck = appData.courses[currentCourse].decks.find(d => d.name === deckName);
+        const totalQuestions = updatedDeck ? updatedDeck.questions.length : 'N/A';
 
         // Show success
         showAddStatus(`✓ Importate ${validation.questionCount} domande! Il deck ora ha ${totalQuestions} domande.`, 'success', 'import');
@@ -924,17 +936,17 @@ function showAddStatus(message, type, tab) {
 }
 
 // ===== Delete Functions =====
-function deleteDeck(courseName, deckName) {
+async function deleteDeck(courseName, deckName) {
     if (!confirm(`Sei sicuro di voler eliminare il deck "${deckName}"?`)) {
         return;
     }
 
     // Delete from storage
-    const success = StorageManager.deleteDeck(courseName, deckName);
+    const success = await StorageManager.deleteDeck(courseName, deckName);
 
     if (success) {
         // Reload app data
-        appData = StorageManager.loadAllData();
+        appData = await StorageManager.loadAllData();
 
         // Re-render decks
         renderDecks();
@@ -947,12 +959,12 @@ function deleteDeck(courseName, deckName) {
 }
 
 // ===== Code Generator Functions =====
-function generateDataCode() {
+async function generateDataCode() {
     console.log('generateDataCode called');
 
     try {
         // Get all data (hard-coded + imported)
-        const allData = StorageManager.loadAllData();
+        const allData = await StorageManager.loadAllData();
         console.log('Data loaded:', allData);
 
         // Generate JavaScript code
