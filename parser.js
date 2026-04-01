@@ -127,6 +127,75 @@ const FileParser = {
     },
 
     /**
+     * Parse a .json file
+     * Expected format: array of objects with:
+     *   - question: string
+     *   - answers: array of { text: string, correct: boolean }
+     *   - correct_index: number
+     */
+    parseJsonFile(fileContent) {
+        let data;
+        try {
+            data = JSON.parse(fileContent);
+        } catch (e) {
+            throw new Error('Il file JSON non è valido: ' + e.message);
+        }
+
+        if (!Array.isArray(data)) {
+            throw new Error('Il file JSON deve contenere un array di domande');
+        }
+
+        const questions = [];
+
+        for (let i = 0; i < data.length; i++) {
+            const item = data[i];
+
+            if (!item.question || !Array.isArray(item.answers) || item.answers.length < 2) {
+                console.warn(`Elemento ${i + 1} nel JSON non valido, saltato`);
+                continue;
+            }
+
+            // Extract answer texts
+            const answerTexts = item.answers.map(a => {
+                if (typeof a === 'string') return a;
+                if (typeof a === 'object' && a.text) return a.text;
+                return '';
+            });
+
+            // Determine correct index
+            let correctIndex = 0;
+            if (typeof item.correct_index === 'number') {
+                correctIndex = item.correct_index;
+            } else if (typeof item.correctIndex === 'number') {
+                correctIndex = item.correctIndex;
+            } else {
+                // Try to find the correct answer from the 'correct' flag
+                const idx = item.answers.findIndex(a => a.correct === true);
+                if (idx !== -1) correctIndex = idx;
+            }
+
+            // Pad to 4 answers if needed
+            while (answerTexts.length < 4) {
+                answerTexts.push('');
+            }
+
+            const question = {
+                question: item.question,
+                answers: answerTexts.slice(0, 4),
+                correctIndex: correctIndex
+            };
+
+            if (question.question && question.answers.every(a => a)) {
+                questions.push(question);
+            } else {
+                console.warn(`Elemento ${i + 1} nel JSON ha campi vuoti, saltato`);
+            }
+        }
+
+        return questions;
+    },
+
+    /**
      * Auto-detect file format and parse accordingly
      */
     parseFile(fileContent, fileName) {
@@ -136,8 +205,10 @@ const FileParser = {
             return this.parseTxtFile(fileContent);
         } else if (extension === 'csv') {
             return this.parseCsvFile(fileContent);
+        } else if (extension === 'json') {
+            return this.parseJsonFile(fileContent);
         } else {
-            throw new Error(`Formato file non supportato: ${extension}. Usa .txt o .csv`);
+            throw new Error(`Formato file non supportato: ${extension}. Usa .txt, .csv o .json`);
         }
     },
 

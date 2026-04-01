@@ -126,11 +126,12 @@
                             <input type="text" id="deckName" placeholder="es. Chapter 2" required>
                         </div>
                         <div class="form-group">
-                            <label for="quizFile">File Quiz (.txt o .csv)</label>
-                            <input type="file" id="quizFile" accept=".txt,.csv" required>
+                            <label for="quizFile">File Quiz (.txt, .csv o .json)</label>
+                            <input type="file" id="quizFile" accept=".txt,.csv,.json" required>
                             <small class="form-help">
                                 Formato .txt: Domanda;Risposta1;Risposta2;Risposta3;Risposta4;;ID<br>
-                                La prima risposta è quella corretta.
+                                Formato .json: array di oggetti con question, answers e correct_index<br>
+                                La prima risposta è quella corretta (nei .txt).
                             </small>
                         </div>
                         <div class="modal-actions">
@@ -214,12 +215,12 @@
                     <div id="importTab" class="tab-content">
                         <form id="importQuestionsForm">
                             <div class="form-group">
-                                <label for="questionsFile">File Domande (.txt o .csv) *</label>
-                                <input type="file" id="questionsFile" accept=".txt,.csv" required>
+                                <label for="questionsFile">File Domande (.txt, .csv o .json) *</label>
+                                <input type="file" id="questionsFile" accept=".txt,.csv,.json" required>
                                 <small class="form-help">
                                     Formato .txt: Domanda;Risposta1;Risposta2;Risposta3;Risposta4;;ID<br>
                                     Formato .csv: domanda,risposta1,risposta2,risposta3,risposta4,correctIndex<br>
-                                    La prima risposta è quella corretta (o specifica correctIndex nel CSV).
+                                    Formato .json: array di oggetti con question, answers e correct_index
                                 </small>
                             </div>
 

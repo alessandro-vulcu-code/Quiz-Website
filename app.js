@@ -294,8 +294,11 @@ function loadQuestion() {
     // Display question with markdown conversion
     elements.questionText.innerHTML = convertMarkdownToHtml(question.question);
 
-    // Shuffle answers while maintaining correctness
-    const shuffledAnswers = shuffleAnswers(question.answers, question.correctIndex);
+    // Keep answers in original order
+    const shuffledAnswers = question.answers.map((text, idx) => ({
+        text: text,
+        isCorrect: idx === question.correctIndex
+    }));
 
     // Render answers
     elements.answersContainer.innerHTML = '';
