@@ -153,13 +153,13 @@ function renderDecks() {
 
     // Add "Exam" deck if there are questions available
     const totalQuestions = course.decks.reduce((sum, deck) => sum + deck.questions.length, 0);
-    if (totalQuestions >= 20) {
+    if (totalQuestions >= 50) {
         const examCard = document.createElement('div');
         examCard.className = 'card exam-deck';
         examCard.innerHTML = `
             <div class="card-icon">📝</div>
             <div class="card-title">Exam Mode</div>
-            <div class="card-description">20 domande casuali da tutti i deck</div>
+            <div class="card-description">50 domande casuali da tutti i deck</div>
         `;
         examCard.addEventListener('click', () => startExamMode());
         elements.deckList.appendChild(examCard);
@@ -239,8 +239,8 @@ function startExamMode() {
         [allQuestions[i], allQuestions[j]] = [allQuestions[j], allQuestions[i]];
     }
 
-    // Take first 20 questions (or all if less than 20)
-    const examQuestions = allQuestions.slice(0, Math.min(20, allQuestions.length));
+    // Take first 50 questions (or all if less than 50)
+    const examQuestions = allQuestions.slice(0, Math.min(50, allQuestions.length));
 
     // Set up exam
     currentDeck = {
