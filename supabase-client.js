@@ -243,5 +243,102 @@ const SupabaseService = {
 
             if (ansError) throw ansError;
         }
+    },
+
+    /**
+     * Carica le impostazioni exam mode per un corso
+     * Ritorna un oggetto { deckName: percentage, ... }
+     */
+    async loadExamSettings(courseName) {
+        try {
+            // Trova il corso
+            const { data: courseData, error: courseError } = await supabaseClient
+                .from('courses')
+                .select('id')
+                .eq('name', courseName)
+                .single();
+
+            if (courseError) return {};
+
+            // Carica le impostazioni con il nome del deck
+            const { data: settings, error: settingsError } = await supabaseClient
+                .from('exam_settings')
+                .select(`
+                    percentage,
+                    decks ( name )
+                `)
+                .eq('course_id', courseData.id);
+
+            if (settingsError) throw settingsError;
+
+            // Trasforma in oggetto { deckName: percentage }
+            const result = {};
+            if (settings) {
+                settings.forEach(s => {
+                    if (s.decks) {
+                        result[s.decks.name] = s.percentage;
+                    }
+                });
+            }
+            return result;
+
+        } catch (error) {
+            console.error('Errore durante il caricamento delle impostazioni exam:', error);
+            return {};
+        }
+    },
+
+    /**
+     * Salva le impostazioni exam mode per un corso
+     * settingsMap: { deckName: percentage, ... }
+     */
+    async saveExamSettings(courseName, settingsMap) {
+        try {
+            // Trova il corso
+            const { data: courseData, error: courseError } = await supabaseClient
+                .from('courses')
+                .select('id')
+                .eq('name', courseName)
+                .single();
+
+            if (courseError) throw courseError;
+            const courseId = courseData.id;
+
+            // Trova tutti i deck del corso
+            const { data: decksData, error: decksError } = await supabaseClient
+                .from('decks')
+                .select('id, name')
+                .eq('course_id', courseId);
+
+            if (decksError) throw decksError;
+
+            // Prepara le righe per upsert
+            const rows = [];
+            decksData.forEach(deck => {
+                const pct = settingsMap[deck.name];
+                if (pct !== undefined) {
+                    rows.push({
+                        course_id: courseId,
+                        deck_id: deck.id,
+                        percentage: parseInt(pct, 10) || 0,
+                        updated_at: new Date().toISOString()
+                    });
+                }
+            });
+
+            if (rows.length > 0) {
+                const { error: upsertError } = await supabaseClient
+                    .from('exam_settings')
+                    .upsert(rows, { onConflict: 'course_id,deck_id' });
+
+                if (upsertError) throw upsertError;
+            }
+
+            return true;
+
+        } catch (error) {
+            console.error('Errore durante il salvataggio delle impostazioni exam:', error);
+            throw error;
+        }
     }
 };

@@ -52,10 +52,22 @@ CREATE TABLE quiz_results (
     completed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 6. Tabella Impostazioni Exam (Exam Settings)
+-- Salva la percentuale di domande da prendere da ogni deck per l'exam mode
+CREATE TABLE exam_settings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
+    deck_id UUID REFERENCES decks(id) ON DELETE CASCADE,
+    percentage INTEGER NOT NULL DEFAULT 0 CHECK (percentage >= 0 AND percentage <= 100),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(course_id, deck_id) -- Una sola impostazione per deck per corso
+);
+
 -- Indici per migliorare le performance delle query
 CREATE INDEX idx_decks_course_id ON decks(course_id);
 CREATE INDEX idx_questions_deck_id ON questions(deck_id);
 CREATE INDEX idx_answers_question_id ON answers(question_id);
+CREATE INDEX idx_exam_settings_course ON exam_settings(course_id);
 CREATE INDEX idx_answers_is_correct ON answers(question_id) WHERE is_correct = TRUE; -- Indice parziale per trovare velocemente la risposta giusta
 
 -- Policy di Sicurezza (Row Level Security - RLS)
@@ -65,12 +77,17 @@ ALTER TABLE decks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE answers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quiz_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE exam_settings ENABLE ROW LEVEL SECURITY;
 
 -- Policy Esempio: Accesso pubblico in lettura (modifica se necessario)
 CREATE POLICY "Public Read Access Courses" ON courses FOR SELECT USING (true);
 CREATE POLICY "Public Read Access Decks" ON decks FOR SELECT USING (true);
 CREATE POLICY "Public Read Access Questions" ON questions FOR SELECT USING (true);
 CREATE POLICY "Public Read Access Answers" ON answers FOR SELECT USING (true);
+CREATE POLICY "Public Read Access Exam Settings" ON exam_settings FOR SELECT USING (true);
+CREATE POLICY "Public Write Access Exam Settings" ON exam_settings FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public Update Access Exam Settings" ON exam_settings FOR UPDATE USING (true);
+CREATE POLICY "Public Delete Access Exam Settings" ON exam_settings FOR DELETE USING (true);
 -- Nota: Per scrivere/modificare dati dovrai aggiungere policy per INSERT/UPDATE/DELETE
 -- basate sul tuo sistema di autenticazione.
 

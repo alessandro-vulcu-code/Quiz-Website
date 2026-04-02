@@ -116,6 +116,11 @@ function setupEventListeners() {
             switchTab(tabName);
         });
     });
+
+    // Exam settings modal handlers
+    document.getElementById('closeExamSettingsModal').addEventListener('click', closeExamSettingsModal);
+    document.getElementById('cancelExamSettings').addEventListener('click', closeExamSettingsModal);
+    document.getElementById('saveExamSettings').addEventListener('click', saveExamSettings);
 }
 
 // ===== Course & Deck Rendering =====
@@ -157,11 +162,23 @@ function renderDecks() {
         const examCard = document.createElement('div');
         examCard.className = 'card exam-deck';
         examCard.innerHTML = `
+            <button class="exam-settings-btn" title="Impostazioni Exam Mode">⚙️</button>
             <div class="card-icon">📝</div>
             <div class="card-title">Exam Mode</div>
             <div class="card-description">50 domande casuali da tutti i deck</div>
         `;
-        examCard.addEventListener('click', () => startExamMode());
+        // Click on the card starts the exam, but NOT on settings button
+        examCard.addEventListener('click', (e) => {
+            if (!e.target.classList.contains('exam-settings-btn')) {
+                startExamMode();
+            }
+        });
+        // Settings button opens the settings modal
+        const settingsBtn = examCard.querySelector('.exam-settings-btn');
+        settingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openExamSettingsModal();
+        });
         elements.deckList.appendChild(examCard);
     }
 
@@ -224,23 +241,62 @@ function startQuiz(deckIndex) {
 }
 
 // ===== Exam Mode =====
-function startExamMode() {
-    // Collect all questions from all decks in the current course
+async function startExamMode() {
     const course = appData.courses[currentCourse];
-    let allQuestions = [];
+    const totalQuestionsTarget = 50;
 
-    course.decks.forEach(deck => {
-        allQuestions = allQuestions.concat(deck.questions.map(q => ({ ...q })));
-    });
-
-    // Shuffle all questions
-    for (let i = allQuestions.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [allQuestions[i], allQuestions[j]] = [allQuestions[j], allQuestions[i]];
+    // Load saved exam settings from Supabase
+    let savedSettings = {};
+    try {
+        savedSettings = await SupabaseService.loadExamSettings(currentCourse);
+    } catch (e) {
+        console.warn('Could not load exam settings, using equal distribution:', e);
     }
 
-    // Take first 50 questions (or all if less than 50)
-    const examQuestions = allQuestions.slice(0, Math.min(50, allQuestions.length));
+    // Check if we have valid saved settings (sum = 100)
+    const savedSum = Object.values(savedSettings).reduce((s, v) => s + v, 0);
+    const hasValidSettings = savedSum === 100 && Object.keys(savedSettings).length > 0;
+
+    let examQuestions = [];
+
+    if (hasValidSettings) {
+        // Use saved percentages to pick from each deck
+        course.decks.forEach(deck => {
+            const pct = savedSettings[deck.name] || 0;
+            if (pct <= 0) return;
+
+            const numFromDeck = Math.round((pct / 100) * totalQuestionsTarget);
+            if (numFromDeck <= 0) return;
+
+            // Copy and shuffle the deck's questions
+            const deckQuestions = deck.questions.map(q => ({ ...q }));
+            for (let i = deckQuestions.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deckQuestions[i], deckQuestions[j]] = [deckQuestions[j], deckQuestions[i]];
+            }
+
+            // Take the required number (or all if less available)
+            examQuestions = examQuestions.concat(deckQuestions.slice(0, Math.min(numFromDeck, deckQuestions.length)));
+        });
+    } else {
+        // Fallback: equal distribution from all decks
+        let allQuestions = [];
+        course.decks.forEach(deck => {
+            allQuestions = allQuestions.concat(deck.questions.map(q => ({ ...q })));
+        });
+        // Shuffle all
+        for (let i = allQuestions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allQuestions[i], allQuestions[j]] = [allQuestions[j], allQuestions[i]];
+        }
+        examQuestions = allQuestions.slice(0, Math.min(totalQuestionsTarget, allQuestions.length));
+    }
+
+    // Final shuffle of all selected questions
+    for (let i = examQuestions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [examQuestions[i], examQuestions[j]] = [examQuestions[j], examQuestions[i]];
+    }
 
     // Set up exam
     currentDeck = {
@@ -257,6 +313,126 @@ function startExamMode() {
 
     showView('quiz');
     loadQuestion();
+}
+
+// ===== Exam Settings Modal Functions =====
+async function openExamSettingsModal() {
+    const modal = document.getElementById('examSettingsModal');
+    modal.classList.add('active');
+
+    const container = document.getElementById('examSettingsContainer');
+    container.innerHTML = '<div style="text-align:center; color: var(--text-muted);">Caricamento...</div>';
+    document.getElementById('examSettingsStatus').style.display = 'none';
+
+    const course = appData.courses[currentCourse];
+
+    // Load saved settings
+    let savedSettings = {};
+    try {
+        savedSettings = await SupabaseService.loadExamSettings(currentCourse);
+    } catch (e) {
+        console.warn('Could not load exam settings:', e);
+    }
+
+    // Build the UI for each deck
+    container.innerHTML = '';
+    course.decks.forEach(deck => {
+        const savedPct = savedSettings[deck.name] !== undefined ? savedSettings[deck.name] : 0;
+
+        const item = document.createElement('div');
+        item.className = 'exam-settings-item';
+        item.innerHTML = `
+            <span class="deck-name">🎯 ${deck.name}</span>
+            <span class="deck-questions">(${deck.questions.length} dom.)</span>
+            <div class="percentage-input-wrapper">
+                <input type="number" 
+                       class="exam-pct-input" 
+                       data-deck="${deck.name}" 
+                       min="0" max="100" step="1" 
+                       value="${savedPct}" 
+                       placeholder="0">
+                <span class="percentage-symbol">%</span>
+            </div>
+        `;
+        container.appendChild(item);
+    });
+
+    // Add event listeners for live total update
+    container.querySelectorAll('.exam-pct-input').forEach(input => {
+        input.addEventListener('input', updateExamTotal);
+    });
+
+    updateExamTotal();
+}
+
+function closeExamSettingsModal() {
+    const modal = document.getElementById('examSettingsModal');
+    modal.classList.remove('active');
+}
+
+function updateExamTotal() {
+    const inputs = document.querySelectorAll('.exam-pct-input');
+    let total = 0;
+    inputs.forEach(input => {
+        total += parseInt(input.value, 10) || 0;
+    });
+
+    const totalEl = document.getElementById('examTotalPercentage');
+    const totalContainer = document.getElementById('examSettingsTotal');
+    totalEl.textContent = `${total}%`;
+
+    // Update visual state
+    totalEl.classList.remove('valid', 'invalid');
+    totalContainer.classList.remove('valid', 'invalid');
+
+    if (total === 100) {
+        totalEl.classList.add('valid');
+        totalContainer.classList.add('valid');
+    } else {
+        totalEl.classList.add('invalid');
+        totalContainer.classList.add('invalid');
+    }
+}
+
+async function saveExamSettings() {
+    const inputs = document.querySelectorAll('.exam-pct-input');
+    const settingsMap = {};
+    let total = 0;
+
+    inputs.forEach(input => {
+        const val = parseInt(input.value, 10) || 0;
+        settingsMap[input.dataset.deck] = val;
+        total += val;
+    });
+
+    // Validate total = 100
+    if (total !== 100) {
+        const statusDiv = document.getElementById('examSettingsStatus');
+        statusDiv.textContent = `❌ La somma deve essere 100% (attualmente ${total}%)`;
+        statusDiv.className = 'import-status error';
+        statusDiv.style.display = 'block';
+        return;
+    }
+
+    try {
+        await SupabaseService.saveExamSettings(currentCourse, settingsMap);
+
+        const statusDiv = document.getElementById('examSettingsStatus');
+        statusDiv.textContent = '✅ Impostazioni salvate con successo!';
+        statusDiv.className = 'import-status success';
+        statusDiv.style.display = 'block';
+
+        setTimeout(() => {
+            closeExamSettingsModal();
+        }, 1500);
+
+    } catch (error) {
+        console.error('Error saving exam settings:', error);
+        const statusDiv = document.getElementById('examSettingsStatus');
+        statusDiv.textContent = `❌ Errore: ${error.message}`;
+        statusDiv.className = 'import-status error';
+        statusDiv.style.display = 'block';
+    }
 }
 
 function restartQuiz() {
