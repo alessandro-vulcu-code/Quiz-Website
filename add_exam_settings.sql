@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS exam_settings (
     UNIQUE(course_id, deck_id)
 );
 
--- 2. Indice per performance
+-- 2. Inonndice per performance
 CREATE INDEX IF NOT EXISTS idx_exam_settings_course ON exam_settings(course_id);
 
 -- 3. Abilita RLS

@@ -118,6 +118,7 @@ function setupEventListeners() {
     });
 
     // Exam settings modal handlers
+    document.getElementById('examSettingsButton').addEventListener('click', openExamSettingsModal);
     document.getElementById('closeExamSettingsModal').addEventListener('click', closeExamSettingsModal);
     document.getElementById('cancelExamSettings').addEventListener('click', closeExamSettingsModal);
     document.getElementById('saveExamSettings').addEventListener('click', saveExamSettings);
@@ -158,28 +159,23 @@ function renderDecks() {
 
     // Add "Exam" deck if there are questions available
     const totalQuestions = course.decks.reduce((sum, deck) => sum + deck.questions.length, 0);
+    const examSettingsButton = document.getElementById('examSettingsButton');
     if (totalQuestions >= 50) {
+        // Show the exam settings button in the header
+        examSettingsButton.style.display = 'inline-block';
+
         const examCard = document.createElement('div');
         examCard.className = 'card exam-deck';
         examCard.innerHTML = `
-            <button class="exam-settings-btn" title="Impostazioni Exam Mode">⚙️</button>
             <div class="card-icon">📝</div>
             <div class="card-title">Exam Mode</div>
             <div class="card-description">50 domande casuali da tutti i deck</div>
         `;
-        // Click on the card starts the exam, but NOT on settings button
-        examCard.addEventListener('click', (e) => {
-            if (!e.target.classList.contains('exam-settings-btn')) {
-                startExamMode();
-            }
-        });
-        // Settings button opens the settings modal
-        const settingsBtn = examCard.querySelector('.exam-settings-btn');
-        settingsBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openExamSettingsModal();
-        });
+        examCard.addEventListener('click', () => startExamMode());
         elements.deckList.appendChild(examCard);
+    } else {
+        // Hide the exam settings button if exam mode is not available
+        examSettingsButton.style.display = 'none';
     }
 
     // Render regular decks
