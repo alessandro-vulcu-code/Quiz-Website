@@ -8,6 +8,11 @@ let shuffledQuestions = [];
 let appData = null; // Will hold all quiz data (hard-coded + imported)
 let quizCompleted = false; // Track if quiz is finished
 
+// Stopwatch state
+let stopwatchInterval = null;
+let stopwatchStartTime = null;
+let stopwatchElapsed = 0; // milliseconds
+
 // ===== DOM Elements =====
 const views = {
     home: document.getElementById('homeView'),
@@ -64,6 +69,7 @@ function setupEventListeners() {
     });
 
     document.getElementById('backToDecks').addEventListener('click', () => {
+        stopStopwatch();
         showView('deck');
         elements.progressContainer.style.display = 'none';
     });
@@ -86,6 +92,7 @@ function setupEventListeners() {
     elements.prevButton.addEventListener('click', goToPreviousQuestion);
     elements.nextQuestionButton.addEventListener('click', goToNextQuestion);
     elements.finishButton.addEventListener('click', finishQuiz);
+    document.getElementById('navFinishButton').addEventListener('click', finishQuiz);
 
     // Results buttons
     document.getElementById('restartQuiz').addEventListener('click', restartQuiz);
@@ -233,6 +240,8 @@ function startQuiz(deckIndex) {
     elements.progressContainer.style.display = 'flex';
 
     showView('quiz');
+    renderQuizNavGrid();
+    startStopwatch();
     loadQuestion();
 }
 
@@ -308,6 +317,8 @@ async function startExamMode() {
     elements.progressContainer.style.display = 'flex';
 
     showView('quiz');
+    renderQuizNavGrid();
+    startStopwatch();
     loadQuestion();
 }
 
@@ -431,6 +442,77 @@ async function saveExamSettings() {
     }
 }
 
+// ===== Stopwatch Functions =====
+function startStopwatch() {
+    stopStopwatch(); // Clear any existing
+    stopwatchStartTime = Date.now();
+    stopwatchElapsed = 0;
+    const display = document.getElementById('stopwatchDisplay');
+    display.textContent = '0:00:00';
+
+    stopwatchInterval = setInterval(() => {
+        stopwatchElapsed = Date.now() - stopwatchStartTime;
+        display.textContent = formatTime(stopwatchElapsed);
+    }, 1000);
+}
+
+function stopStopwatch() {
+    if (stopwatchInterval) {
+        clearInterval(stopwatchInterval);
+        stopwatchInterval = null;
+    }
+    if (stopwatchStartTime) {
+        stopwatchElapsed = Date.now() - stopwatchStartTime;
+    }
+}
+
+function formatTime(ms) {
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+// ===== Quiz Navigation Grid =====
+function renderQuizNavGrid() {
+    const grid = document.getElementById('quizNavGrid');
+    grid.innerHTML = '';
+
+    shuffledQuestions.forEach((_, index) => {
+        const btn = document.createElement('button');
+        btn.className = 'quiz-nav-btn';
+        btn.textContent = index + 1;
+        btn.title = `Domanda ${index + 1}`;
+        btn.addEventListener('click', () => goToQuestion(index));
+        grid.appendChild(btn);
+    });
+
+    updateQuizNavGrid();
+}
+
+function updateQuizNavGrid() {
+    const buttons = document.querySelectorAll('.quiz-nav-btn');
+    buttons.forEach((btn, index) => {
+        btn.classList.remove('current', 'correct', 'incorrect');
+
+        const answer = userAnswers[index];
+        if (answer !== null) {
+            btn.classList.add(answer.isCorrect ? 'correct' : 'incorrect');
+        }
+        if (index === currentQuestionIndex) {
+            btn.classList.add('current');
+        }
+    });
+}
+
+function goToQuestion(index) {
+    if (index >= 0 && index < shuffledQuestions.length) {
+        currentQuestionIndex = index;
+        loadQuestion();
+    }
+}
+
 function restartQuiz() {
     currentQuestionIndex = 0;
     score = 0;
@@ -439,6 +521,8 @@ function restartQuiz() {
     userAnswers = new Array(shuffledQuestions.length).fill(null);
     showView('quiz');
     elements.progressContainer.style.display = 'flex';
+    renderQuizNavGrid();
+    startStopwatch();
     loadQuestion();
 }
 
@@ -519,6 +603,9 @@ function loadQuestion() {
     // Update navigation buttons
     updateNavigationButtons();
 
+    // Update quiz navigation grid
+    updateQuizNavGrid();
+
     // Trigger MathJax rendering
     if (window.MathJax) {
         MathJax.typesetPromise([elements.questionText, elements.answersContainer]);
@@ -589,6 +676,9 @@ function handleConfirm() {
 
     // Update navigation
     updateNavigationButtons();
+
+    // Update quiz navigation grid
+    updateQuizNavGrid();
 }
 
 function showFeedback(isCorrect) {
@@ -617,8 +707,12 @@ function updateNavigationButtons() {
     // Next button
     elements.nextQuestionButton.style.display = isLastQuestion ? 'none' : 'inline-block';
 
-    // Finish button
+    // Finish button (in quiz actions)
     elements.finishButton.style.display = (isLastQuestion && allAnswered) ? 'inline-block' : 'none';
+
+    // Sidebar finish button
+    const navFinish = document.getElementById('navFinishButton');
+    navFinish.disabled = !allAnswered;
 }
 
 function goToPreviousQuestion() {
@@ -637,6 +731,7 @@ function goToNextQuestion() {
 
 function finishQuiz() {
     quizCompleted = true;
+    stopStopwatch();
     showResults();
 }
 
@@ -677,6 +772,10 @@ function showResults() {
 
     elements.resultsMessage.textContent = message;
     document.querySelector('.results-icon').textContent = icon;
+
+    // Show elapsed time
+    const resultsTimeValue = document.getElementById('resultsTimeValue');
+    resultsTimeValue.textContent = formatTime(stopwatchElapsed);
 
     // Generate detailed review
     generateReview();

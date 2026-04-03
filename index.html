@@ -53,31 +53,56 @@
 
         <!-- Quiz View -->
         <div id="quizView" class="view">
-            <div class="quiz-container">
-                <div class="quiz-header">
-                    <button class="back-button" id="backToDecks">← Torna ai Deck</button>
-                    <div class="quiz-info">
-                        <span id="quizDeckName">Appendix Questions</span>
-                        <span class="score" id="scoreDisplay">Punteggio: 0/0</span>
+            <div class="quiz-layout">
+                <!-- Main Quiz Content -->
+                <div class="quiz-main">
+                    <div class="quiz-container">
+                        <div class="quiz-header">
+                            <button class="back-button" id="backToDecks">← Torna ai Deck</button>
+                            <div class="quiz-info">
+                                <span id="quizDeckName">Appendix Questions</span>
+                                <span class="score" id="scoreDisplay">Punteggio: 0/0</span>
+                            </div>
+                        </div>
+
+                        <div class="question-card" id="questionCard">
+                            <div class="question-text" id="questionText"></div>
+                            <div class="answers-container" id="answersContainer"></div>
+
+                            <div class="feedback" id="feedback" style="display: none;">
+                                <div class="feedback-icon" id="feedbackIcon"></div>
+                                <div class="feedback-text" id="feedbackText"></div>
+                            </div>
+
+                            <div class="quiz-actions">
+                                <button class="btn btn-secondary" id="prevButton">← Precedente</button>
+                                <button class="btn btn-primary" id="confirmButton">Conferma</button>
+                                <button class="btn btn-secondary" id="nextQuestionButton">Prossima →</button>
+                                <button class="btn btn-primary" id="finishButton" style="display: none;">Termina
+                                    Quiz</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="question-card" id="questionCard">
-                    <div class="question-text" id="questionText"></div>
-                    <div class="answers-container" id="answersContainer"></div>
-
-                    <div class="feedback" id="feedback" style="display: none;">
-                        <div class="feedback-icon" id="feedbackIcon"></div>
-                        <div class="feedback-text" id="feedbackText"></div>
+                <!-- Quiz Navigation Sidebar -->
+                <aside class="quiz-nav-sidebar" id="quizNavSidebar">
+                    <div class="quiz-nav-header">QUIZ NAVIGATION</div>
+                    <div class="quiz-nav-grid" id="quizNavGrid">
+                        <!-- Populated dynamically by JS -->
                     </div>
-
-                    <div class="quiz-actions">
-                        <button class="btn btn-secondary" id="prevButton">← Precedente</button>
-                        <button class="btn btn-primary" id="confirmButton">Conferma</button>
-                        <button class="btn btn-secondary" id="nextQuestionButton">Prossima →</button>
-                        <button class="btn btn-primary" id="finishButton" style="display: none;">Termina Quiz</button>
+                    <div class="quiz-nav-legend">
+                        <div class="legend-item"><span class="legend-dot legend-correct"></span> Corretta</div>
+                        <div class="legend-item"><span class="legend-dot legend-incorrect"></span> Sbagliata</div>
+                        <div class="legend-item"><span class="legend-dot legend-current"></span> Attuale</div>
+                        <div class="legend-item"><span class="legend-dot legend-unanswered"></span> Da fare</div>
                     </div>
-                </div>
+                    <button class="quiz-nav-finish" id="navFinishButton">Termina Quiz...</button>
+                    <div class="quiz-nav-stopwatch">
+                        <span class="stopwatch-label">⏱ Tempo</span>
+                        <span class="stopwatch-time" id="stopwatchDisplay">0:00:00</span>
+                    </div>
+                </aside>
             </div>
         </div>
 
@@ -89,6 +114,10 @@
                 <div class="results-score">
                     <div class="score-big" id="finalScore">0/0</div>
                     <div class="score-percentage" id="scorePercentage">0%</div>
+                </div>
+                <div class="results-time" id="resultsTime">
+                    <span class="results-time-icon">⏱</span>
+                    <span class="results-time-value" id="resultsTimeValue">0:00:00</span>
                 </div>
                 <p class="results-message" id="resultsMessage"></p>
                 <div class="results-actions">
