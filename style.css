@@ -33,12 +33,59 @@
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ===== Light Theme ===== */
+[data-theme="light"] {
+    --bg-primary: #f1f5f9;
+    --bg-secondary: #e2e8f0;
+    --bg-card: #ffffff;
+    --bg-hover: #cbd5e1;
+
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.12);
+}
+
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
     color: var(--text-primary);
     min-height: 100vh;
     line-height: 1.6;
+}
+
+[data-theme="light"] body {
+    background: linear-gradient(135deg, #e2e8f0 0%, #f1f5f9 100%);
+}
+
+/* ===== Theme Toggle ===== */
+.theme-toggle {
+    background: var(--bg-secondary);
+    border: 2px solid var(--bg-hover);
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition);
+    flex-shrink: 0;
+}
+
+.theme-toggle:hover {
+    background: var(--bg-hover);
+    border-color: var(--primary);
+    transform: rotate(30deg) scale(1.1);
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+}
+
+.theme-toggle-icon {
+    font-size: 1.3rem;
+    line-height: 1;
+    transition: transform 0.4s ease;
 }
 
 /* ===== Container ===== */
@@ -823,6 +870,10 @@ mjx-container {
     backdrop-filter: blur(5px);
     z-index: 1000;
     animation: fadeIn 0.3s ease;
+}
+
+[data-theme="light"] .modal {
+    background: rgba(0, 0, 0, 0.4);
 }
 
 .modal.active {

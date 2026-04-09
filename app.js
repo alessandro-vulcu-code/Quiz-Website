@@ -52,6 +52,9 @@ function showView(viewName) {
 
 // ===== Initialization =====
 async function init() {
+    // Initialize theme
+    initTheme();
+
     // Show loading state (optional, but good practice)
     const courseList = document.getElementById('courseList');
     if (courseList) courseList.innerHTML = '<div class="loading">Caricamento corsi...</div>';
@@ -62,7 +65,30 @@ async function init() {
     setupEventListeners();
 }
 
+// ===== Theme Toggle =====
+function initTheme() {
+    const saved = localStorage.getItem('theme') || 'dark';
+    applyTheme(saved);
+}
+
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const icon = document.getElementById('themeToggleIcon');
+    if (icon) {
+        icon.textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+    localStorage.setItem('theme', theme);
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+
 function setupEventListeners() {
+    // Theme toggle
+    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
     // Back buttons
     document.getElementById('backToCourses').addEventListener('click', () => {
         showView('home');
