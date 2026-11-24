@@ -1,0 +1,242 @@
+[
+                        {
+                            "question": "Which of the following is the correct HTML5 document type declaration?",
+                            "answers": [
+                                "&lt;!DOCTYPE html PUBLIC&gt;",
+                                "&lt;!DOCTYPE html5&gt;",
+                                "&lt;!DOCTYPE html5 PUBLIC&gt;",
+                                "&lt;!DOCTYPE html&gt;"
+                            ],
+                            "correctIndex": 3
+                        },
+                        {
+                            "question": "What is an RDF triple?",
+                            "answers": [
+                                "It is the way to connect HTTP, AJAX, and REST",
+                                "It is a relationship among rows belonging to three different tables",
+                                "It is a mechanism to encode information in a more secure way",
+                                "It is a statement of the form subject, predicate, object"
+                            ],
+                            "correctIndex": 3
+                        },
+                        {
+                            "question": "What does IDEMPOTENT HTTP method mean?",
+                            "answers": [
+                                "It is a method whose multiple invocations produce different effects",
+                                "It is a method which prevents the automatic repetition of the same request",
+                                "It is a method which cannot be cached",
+                                "It is a method whose multiple invocations produce the same effect as a single one"
+                            ],
+                            "correctIndex": 3
+                        },
+                        {
+                            "question": "What is the DOM API?",
+                            "answers": [
+                                "It is a simple API for XML which operates on each piece of the XML document sequentially",
+                                "It is a push streaming API for XML which notifies the applications of events by means of call-backs",
+                                "It is a pull streaming API for XML which returns events to the applications when asked",
+                                "It is an API which creates an in-memory representation of the XML"
+                            ],
+                            "correctIndex": 3
+                        },
+                        {
+                            "question": "Which of the following sentences is correct?",
+                            "answers": [
+                                "Both JavaScript and HTML are case-sensitive languages.",
+                                "JavaScript is case-sensitive, while HTML is not case-sensitive.",
+                                "JavaScript is not case-sensitive, while HTML is case-sensitive.",
+                                "Both JavaScript and HTML are not case-sensitive."
+                            ],
+                            "correctIndex": 1
+                        },
+                        {
+                            "question": "How does the JSP technology work?",
+                            "answers": [
+                                "The JSP page directly returns the response to the client, after processing the request",
+                                "The JSP is executed by an interpreter, like PHP, and processes the request",
+                                "The JSP page forwards the request to a servlet which processes it",
+                                "A pre-processor translates a JSP into a servlet and then the servlet processes the request"
+                            ],
+                            "correctIndex": 3
+                        },
+                        {
+                            "question": "What is correct to say? \"Surfing the Web\" and/or \"Surfing the Internet\"?",
+                            "answers": [
+                                "Both of them",
+                                "Surfing the Internet",
+                                "None of them",
+                                "Surfing the Web"
+                            ],
+                            "correctIndex": 3
+                        },
+                        {
+                            "question": "What is the purpose of the application logic layer?",
+                            "answers": [
+                                "To define the format and visualisation of information",
+                                "To manage the persistent storage of the data",
+                                "To define and control the flow of operations in the application",
+                                "To manage the interaction with the user"
+                            ],
+                            "correctIndex": 2
+                        },
+                        {
+                            "question": "What is the semantic Web?",
+                            "answers": [
+                                "It is the evolution of the Web where the contents of an HTML page are clearly described",
+                                "It is the Web of data where resources are connected by means of typed links",
+                                "It is a new type of Web applications where users can express themselves using the natural language semantics",
+                                "It is the evolution of the Web where contents are more meaningful to human beings"
+                            ],
+                            "correctIndex": 1
+                        },
+                        {
+                            "question": "How are different parts separated in a MIME multipart content?",
+                            "answers": [
+                                "There is a random boundary which changes for each part and it is prefixed by --",
+                                "There is a random boundary which is the same for each part and it is prefixed by --",
+                                "There is a blank line separating each part",
+                                "There is an arbitrary sequence of characters, not appearing in any part, used as boundary"
+                            ],
+                            "correctIndex": 3
+                        },
+                        {
+                            "question": "What is the purpose of the CSS clear property?",
+                            "answers": [
+                                "It clears the content of a float element without removing the space that it would have occupied",
+                                "It prevents the element from appearing next to a floated element and forces it to start against the next available space",
+                                "It removes a float element from the normal flow and allows it to start on the next available space",
+                                "It clears both sides of a floating element, allowing it to be surrounded only by elements inside the normal flow and not by float elements"
+                            ],
+                            "correctIndex": 1
+                        },
+                        {
+                            "question": "What kind of diagram is most appropriate to describe the detailed functioning of a given operation?",
+                            "answers": [
+                                "An ER schema",
+                                "An interface mockup",
+                                "An UML sequence diagram",
+                                "An UML class diagram"
+                            ],
+                            "correctIndex": 2
+                        },
+                        {
+                            "question": "What is a Docker Image?",
+                            "answers": [
+                                "It is a standalone, lightweight, and isolated runtime environment",
+                                "It represents a component of an application",
+                                "It is a snapshot of the libraries and dependencies required by a container to run properly",
+                                "It is a tool for managing the cooperative development of source code"
+                            ],
+                            "correctIndex": 2
+                        },
+                        {
+                            "question": "What is the dark Web?",
+                            "answers": [
+                                "It is the Web of static pages",
+                                "It is the Web originated from databases",
+                                "It is the not indexable Web",
+                                "It is the Web ensuring anonymity"
+                            ],
+                            "correctIndex": 3
+                        },
+                        {
+                            "question": "What are the disadvantages of a three-tiers architecture?",
+                            "answers": [
+                                "Management of the terminals",
+                                "Scalability",
+                                "Difficulty of implementation",
+                                "Possibility to balance the load"
+                            ],
+                            "correctIndex": 2
+                        },
+                        {
+                            "question": "What is the purpose of the **init** method in a Java servlet?",
+                            "answers": [
+                                "It is called by the container only once upon servlet creation to setup any needed resources",
+                                "It is called by the container to release any needed resources every time after servicing a request",
+                                "It is called by the container to setup any needed resources every time before servicing a request",
+                                "It is called by the container only once before servlet disposal to release any needed resources"
+                            ],
+                            "correctIndex": 0
+                        },
+                        {
+                            "question": "Which of the following is the correct way to define a radio button?",
+                            "answers": [
+                                "<pre><code>&lt;input type=\"radio\" name=\"male\" value=\"gender\" checked&gt; Male&lt;br&gt;\n&lt;input type=\"radio\" name=\"female\" value=\"gender\"&gt; Female&lt;br&gt;\n&lt;input type=\"radio\" name=\"other\" value=\"gender\"&gt; Other</code></pre>",
+                                "<pre><code>&lt;input type=\"radio\" name=\"gender_m\" value=\"male\" checked&gt; Male&lt;br&gt;&lt;/input&gt;\n&lt;input type=\"radio\" name=\"gender_f\" value=\"female\"&gt; Female&lt;br&gt;&lt;/input&gt;\n&lt;input type=\"radio\" name=\"gender_o\" value=\"other\"&gt; Other&lt;/input&gt;</code></pre>",
+                                "<pre><code>&lt;input type=\"radio\" name=\"gender_m\" value=\"male\" checked&gt; Male&lt;br&gt;\n&lt;input type=\"radio\" name=\"gender_f\" value=\"female\"&gt; Female&lt;br&gt;\n&lt;input type=\"radio\" name=\"gender_o\" value=\"other\"&gt; Other</code></pre>",
+                                "<pre><code>&lt;input type=\"radio\" name=\"gender\" value=\"male\" checked&gt; Male&lt;br&gt;\n&lt;input type=\"radio\" name=\"gender\" value=\"female\"&gt; Female&lt;br&gt;\n&lt;input type=\"radio\" name=\"gender\" value=\"other\"&gt; Other</code></pre>"
+                            ],
+                            "correctIndex": 3
+                        },
+                        {
+                            "question": "What is XSS?",
+                            "answers": [
+                                "It allows for sharing cookies across domains, i.e. Cross-Site Sharing",
+                                "It injects malicious code into victim's web browser, i.e. Cross-Site Scripting",
+                                "It is the way of representing a session with XML, i.e. XML Session Sheet",
+                                "It is the newer version of CSS, i.e. eXtreme Style Sheets"
+                            ],
+                            "correctIndex": 1
+                        },
+                        {
+                            "question": "What is the typical implementation of the MVC pattern using Java technologies?",
+                            "answers": [
+                                "Servlets are the model, JSP are the View, and JavaBeans are the Controller",
+                                "JavaBeans are the model, servlets are the View, and JSP are the Controller",
+                                "JavaBeans are the model, JSP are the View, and servlets are the Controller",
+                                "JSP are the model, JavaBeans are the View, and servlets are the Controller"
+                            ],
+                            "correctIndex": 2
+                        },
+                        {
+                            "question": "How does HTTP basic authentication work?",
+                            "answers": [
+                                "Username and password are concatenated with a colon and then Base64 encoded in the Authorization header",
+                                "Username and password are Base64 encoded and then concatenated with a colon in the WWW-Authenticate header",
+                                "Username and password are concatenated with a colon and then Base64 encoded in the WWW-Authenticate header",
+                                "Username and password are Base64 encoded and then concatenated with a colon in the Authorization header"
+                            ],
+                            "correctIndex": 0
+                        },
+                        {
+                            "question": "What is a problem in this servlet code?<pre><code>public class MyDownloadServlet extends HttpServlet {\n\n    private File file = null;\n\n    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {\n        String path = req.getParameter(\"path\");\n        file = new File(path);\n        FileInputStream fis = new FileInputStream(file);\n\n        int c = -1;\n        while ((c = fis.read()) != -1) {\n            resp.getOutputStream().write(c);\n        }\n    }\n}</code></pre>",
+                            "answers": [
+                                "It may throw exceptions",
+                                "It may not find the file on the disk",
+                                "There is no problem: the code compiles and executes correctly",
+                                "It may present thread-safety problems"
+                            ],
+                            "correctIndex": 3
+                        },
+                        {
+                            "question": "JavaScript programs are:",
+                            "answers": [
+                                "Loaded in the same order as they appear in the document and executed when an event is registered.",
+                                "Loaded and executed in the same order as they appear in the document.",
+                                "Loaded and executed first if they are embedded script and later if they are external script.",
+                                "Loaded and executed first if they are embedded or external script and later if they are exported from another web server."
+                            ],
+                            "correctIndex": 1
+                        },
+                        {
+                            "question": "What is the purpose of the MIME application/x-www-form-urlencoded media type?",
+                            "answers": [
+                                "To upload files and send form fields",
+                                "To percent encode URL",
+                                "Only to upload files",
+                                "Only to send form fields"
+                            ],
+                            "correctIndex": 3
+                        },
+                        {
+                            "question": "What is a descriptive markup language?",
+                            "answers": [
+                                "It refers to entities external to the document",
+                                "It provides the means for extending the vocabulary of the language",
+                                "It defines the type or class of the content to indicate its intended use",
+                                "It contains commands to format and layout the content"
+                            ],
+                            "correctIndex": 2
+                        }
+]

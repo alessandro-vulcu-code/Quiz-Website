@@ -206,6 +206,8 @@ main { padding-block: clamp(2rem, 6vw, 5rem) 4rem; }
     text-transform: uppercase;
 }
 
+#deckManagementStatus { margin-bottom: 1rem; }
+
 .study-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto 1.25rem;
@@ -554,7 +556,7 @@ body:has(.modal[open]) { overflow: hidden; }
 
 .modal-close:hover { background: var(--wash); }
 .modal-body { padding: clamp(1rem, 4vw, 1.5rem); }
-.delete-course-message { overflow-wrap: anywhere; }
+.delete-study-message { overflow-wrap: anywhere; }
 .modal-actions { justify-content: flex-end; margin-top: 1.25rem; }
 .form-group { margin-bottom: 1rem; }
 .form-group > label, .answer-fields legend { display: block; margin-bottom: .375rem; font-size: .875rem; font-weight: 650; }
@@ -569,6 +571,10 @@ body:has(.modal[open]) { overflow: hidden; }
 }
 
 .form-group :is(input, textarea)::placeholder { color: var(--muted); opacity: 1; }
+.import-deck-names { min-width: 0; margin: 0; padding: 0; border: 0; }
+.import-deck-names legend { margin-bottom: .75rem; padding: 0; font-size: .875rem; font-weight: 700; }
+.import-deck-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); align-items: center; gap: .5rem 1rem; }
+.import-deck-row > label { margin: 0; overflow-wrap: anywhere; }
 .form-group input[type="file"] { font-size: .875rem; }
 input::file-selector-button { margin-right: .5rem; padding: .25rem .5rem; border: 1px solid var(--control-border); border-radius: 2px; background: var(--wash); color: var(--ink); cursor: pointer; }
 textarea { resize: vertical; }
@@ -655,6 +661,7 @@ a.back-button { text-decoration: none; }
     .card-description { grid-column: 1; grid-row: 2; }
     .row-arrow { grid-column: 2; grid-row: 1 / span 2; }
     .deck-actions { flex-direction: column; align-items: stretch; justify-content: center; gap: 0; }
+    .import-deck-row { grid-template-columns: minmax(0, 1fr); }
     .quiz-actions .btn { padding-inline: .6rem; font-size: .8125rem; }
 }
 

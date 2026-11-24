@@ -1,6 +1,6 @@
 -- Abilita le operazioni di Study Hub sul progetto Supabase di sviluppo.
 -- Il sito attuale usa il ruolo anon per modificare la raccolta condivisa.
--- Queste funzioni espongono solo le tre operazioni richieste, una riga per chiamata.
+-- Le funzioni di gestione operano su un solo corso o deck per chiamata.
 
 BEGIN;
 
@@ -38,11 +38,23 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.delete_study_deck(target_id uuid, expected_name text)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
+AS $$
+BEGIN
+    DELETE FROM public.decks WHERE id = target_id AND name = expected_name AND is_imported IS TRUE;
+    RETURN FOUND;
+END;
+$$;
+
 REVOKE EXECUTE ON FUNCTION public.rename_study_course(uuid, text, text) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.rename_study_deck(uuid, text, text) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.delete_study_course(uuid, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.delete_study_deck(uuid, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.rename_study_course(uuid, text, text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.rename_study_deck(uuid, text, text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.delete_study_course(uuid, text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.delete_study_deck(uuid, text) TO anon, authenticated;
 
 COMMIT;

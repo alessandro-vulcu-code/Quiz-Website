@@ -54,6 +54,7 @@
                     </div>
                 </div>
                 <div id="examSlot"></div>
+                <p id="deckManagementStatus" class="import-status success" role="status" hidden></p>
                 <div class="index-heading"><span>Deck</span><span>Domande</span></div>
                 <div id="deckList" class="card-grid"></div>
             </div>
@@ -165,19 +166,19 @@
                             <label for="quizFile">File quiz (.txt, .csv o .json)</label>
                             <input type="file" id="quizFile" accept=".txt,.csv,.json" aria-describedby="quizFileHelp" multiple required>
                             <small class="form-help" id="quizFileHelp">
-                                Puoi selezionare più file. Ogni file crea un deck con il nome del file.<br>
+                                Puoi selezionare più file e modificare il nome di ogni deck prima di confermare.<br>
                                 Formato .txt: Domanda;Risposta1;Risposta2;Risposta3;Risposta4;;ID<br>
                                 Formato .json: array di oggetti con question, answers e correct_index<br>
                                 La prima risposta è quella corretta (nei .txt).
                             </small>
                         </div>
-                        <div class="form-group" id="deckNameGroup">
-                            <label for="deckName">Nome deck</label>
-                            <input type="text" id="deckName" placeholder="es. Chapter 2" required>
-                        </div>
+                        <fieldset class="import-deck-names" id="importDeckNames" hidden>
+                            <legend>Nomi dei deck</legend>
+                            <div id="importDeckRows"></div>
+                        </fieldset>
                         <div class="modal-actions">
                             <button type="button" class="btn btn-secondary" id="cancelImport">Annulla</button>
-                            <button type="submit" class="btn btn-primary">Importa</button>
+                            <button type="submit" class="btn btn-primary" id="confirmQuizImport" disabled>Conferma importazione</button>
                         </div>
                     </form>
                     <div id="importStatus" class="import-status" role="status" style="display: none;"></div>
@@ -365,6 +366,7 @@ git push</pre>
                         <label for="studyName">Nuovo nome</label>
                         <input type="text" id="studyName" required autofocus>
                     </div>
+                    <p class="import-status" role="status" hidden></p>
                     <p class="import-status error" role="alert" hidden></p>
                     <div class="modal-actions">
                         <button type="button" class="btn btn-secondary" data-close-dialog>Annulla</button>
@@ -373,18 +375,19 @@ git push</pre>
                 </div>
             </form>
         </dialog>
-        <dialog id="deleteCourseDialog" class="modal" aria-labelledby="deleteCourseTitle" aria-describedby="deleteCourseMessage">
+        <dialog id="deleteStudyDialog" class="modal" aria-labelledby="deleteStudyTitle" aria-describedby="deleteStudyMessage">
             <form>
                 <div class="modal-header">
-                    <h2 id="deleteCourseTitle">Elimina corso</h2>
+                    <h2 id="deleteStudyTitle"></h2>
                     <button class="modal-close" type="button" data-close-dialog aria-label="Chiudi">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <p class="delete-course-message" id="deleteCourseMessage"></p>
+                    <p class="delete-study-message" id="deleteStudyMessage"></p>
+                    <p class="import-status" role="status" hidden></p>
                     <p class="import-status error" role="alert" hidden></p>
                     <div class="modal-actions">
                         <button type="button" class="btn btn-secondary" data-close-dialog autofocus>Annulla</button>
-                        <button type="submit" class="btn btn-danger">Elimina corso</button>
+                        <button type="submit" class="btn btn-danger">Elimina</button>
                     </div>
                 </div>
             </form>

@@ -14,7 +14,7 @@ let deckColorTarget = null;
 let fileImportInProgress = false;
 let studyChangeInProgress = false;
 let renameTarget = null;
-let deleteCourseTarget = null;
+let deleteStudyTarget = null;
 
 // Stopwatch state
 let stopwatchInterval = null;
@@ -102,6 +102,7 @@ function restoreRoute(route) {
     activeRoute = route;
     currentCourse = route.course ?? null;
     document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
+    document.getElementById('deckManagementStatus').hidden = true;
     elements.progressContainer.style.display = route.view === 'quiz' ? 'flex' : 'none';
 
     if (route.view === 'home') {
@@ -213,7 +214,7 @@ function setupEventListeners() {
     document.getElementById('closeImportModal').addEventListener('click', closeImportModal);
     document.getElementById('cancelImport').addEventListener('click', closeImportModal);
     document.getElementById('importForm').addEventListener('submit', handleImportSubmit);
-    document.getElementById('quizFile').addEventListener('change', updateImportDeckName);
+    document.getElementById('quizFile').addEventListener('change', () => renderImportDeckNames());
 
     // Code generator handlers
     document.getElementById('generateCodeButton').addEventListener('click', generateDataCode);
@@ -245,8 +246,8 @@ function setupEventListeners() {
     document.querySelector('#startExamDialog form').addEventListener('submit', submitExamStart);
     document.getElementById('renameCourseButton').addEventListener('click', () => openRenameStudyDialog(currentCourse));
     document.querySelector('#renameStudyDialog form').addEventListener('submit', handleStudyRename);
-    document.getElementById('deleteCourseButton').addEventListener('click', openDeleteCourseDialog);
-    document.querySelector('#deleteCourseDialog form').addEventListener('submit', handleCourseDeletion);
+    document.getElementById('deleteCourseButton').addEventListener('click', () => openDeleteStudyDialog(currentCourse));
+    document.querySelector('#deleteStudyDialog form').addEventListener('submit', handleStudyDeletion);
     document.querySelectorAll('[data-close-dialog]').forEach(button => {
         button.addEventListener('click', () => button.closest('dialog').close());
     });
@@ -385,7 +386,8 @@ function renderDecks() {
             deleteButton.type = 'button';
             deleteButton.textContent = 'Elimina';
             deleteButton.setAttribute('aria-label', `Elimina deck ${deck.name}`);
-            deleteButton.addEventListener('click', () => deleteDeck(currentCourse, deck.name));
+            deleteButton.setAttribute('aria-haspopup', 'dialog');
+            deleteButton.addEventListener('click', () => openDeleteStudyDialog(currentCourse, deck));
             actions.appendChild(deleteButton);
         }
 
@@ -1047,7 +1049,7 @@ function openImportModal(courseName = '') {
     document.getElementById('importForm').reset();
     document.getElementById('importStatus').style.display = 'none';
     populateCourseSelect(courseName);
-    updateImportDeckName();
+    renderImportDeckNames();
     modal.showModal();
 }
 
@@ -1056,10 +1058,34 @@ function closeImportModal() {
     modal.close();
 }
 
-function updateImportDeckName() {
-    const multipleFiles = document.getElementById('quizFile').files.length > 1;
-    document.getElementById('deckNameGroup').hidden = multipleFiles;
-    document.getElementById('deckName').required = !multipleFiles;
+function renderImportDeckNames(decks) {
+    decks ??= Array.from(document.getElementById('quizFile').files, file => ({
+        file,
+        name: file.name.replace(/\.[^.]+$/, '').trim() || file.name
+    }));
+
+    const rows = decks.map(({ file, name }, index) => {
+        const row = document.createElement('div');
+        row.className = 'form-group import-deck-row';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = `importDeckName-${index}`;
+        input.name = 'importDeckName';
+        input.value = name;
+        input.required = true;
+
+        const label = document.createElement('label');
+        label.htmlFor = input.id;
+        label.textContent = file.name;
+        row.append(label, input);
+        return row;
+    });
+
+    document.getElementById('importDeckRows').replaceChildren(...rows);
+    document.getElementById('importDeckNames').hidden = decks.length === 0;
+    document.getElementById('confirmQuizImport').disabled = decks.length === 0;
+    document.getElementById('importStatus').style.display = 'none';
 }
 
 async function handleImportSubmit(event) {
@@ -1072,7 +1098,6 @@ async function handleImportSubmit(event) {
     const courseName = isNewCourse ? document.getElementById('courseName').value.trim() : courseSelect.value;
     const fileInput = document.getElementById('quizFile');
     const files = Array.from(fileInput.files);
-    const deckNameInput = document.getElementById('deckName');
 
     if (!courseName) {
         showStatus(isNewCourse ? 'Inserisci il nome del nuovo corso' : 'Seleziona un corso', 'error');
@@ -1083,9 +1108,10 @@ async function handleImportSubmit(event) {
         return;
     }
 
-    const decks = files.map(file => ({
+    const nameInputs = form.querySelectorAll('input[name="importDeckName"]');
+    const decks = files.map((file, index) => ({
         file,
-        name: files.length === 1 ? deckNameInput.value.trim() : file.name.replace(/\.[^.]+$/, '').trim()
+        name: nameInputs[index].value.trim()
     }));
     const deckNames = new Set((appData.courses[courseName]?.decks ?? []).map(deck => deck.name));
     for (const { file, name } of decks) {
@@ -1104,6 +1130,7 @@ async function handleImportSubmit(event) {
     showStatus('Importazione in corso…', 'progress');
     let savedDecks = 0;
     let savedQuestions = 0;
+    let importError;
     try {
         for (const deck of decks) {
             deck.questions = await readQuizFile(deck.file);
@@ -1117,31 +1144,34 @@ async function handleImportSubmit(event) {
             savedDecks++;
             savedQuestions += questions.length;
         }
-
-        if (form.closest('dialog').open) {
-            fileInput.value = '';
-            updateImportDeckName();
-            showStatus(`✓ Deck importati: ${savedDecks} · ${questionCount(savedQuestions)}`, 'success');
-        }
     } catch (error) {
         console.error('Import error:', error);
-        if (savedDecks > 0) {
-            const remaining = decks.slice(savedDecks);
-            const selection = new DataTransfer();
-            remaining.forEach(deck => selection.items.add(deck.file));
-            fileInput.files = selection.files;
-            deckNameInput.value = remaining.length === 1 ? remaining[0].name : '';
-            updateImportDeckName();
-        }
-        showStatus(`Deck importati: ${savedDecks} su ${decks.length}. ${error.message}`, 'error');
+        importError = error;
     } finally {
         try {
             if (savedDecks > 0) await refreshFileImportData();
-            if (savedDecks === decks.length && form.closest('dialog').open) closeAfterFileImport(form);
         } finally {
             unlock();
         }
     }
+
+    if (!form.closest('dialog').open) return;
+    if (!importError) {
+        fileInput.value = '';
+        renderImportDeckNames();
+        showStatus(`✓ Deck importati: ${savedDecks} · ${questionCount(savedQuestions)}`, 'success');
+        closeAfterFileImport(form);
+        return;
+    }
+
+    if (savedDecks > 0) {
+        const remaining = decks.slice(savedDecks);
+        const selection = new DataTransfer();
+        remaining.forEach(deck => selection.items.add(deck.file));
+        fileInput.files = selection.files;
+        renderImportDeckNames(remaining);
+    }
+    showStatus(`Deck importati: ${savedDecks} su ${decks.length}. ${importError.message}`, 'error');
 }
 
 async function readQuizFile(file) {
@@ -1437,7 +1467,10 @@ function showAddStatus(message, type, tab) {
 
 // ===== Course and Deck Management =====
 function openRenameStudyDialog(courseName, deck = null) {
-    if (fileImportInProgress || studyChangeInProgress) return;
+    if (fileImportInProgress || studyChangeInProgress) {
+        showDeckManagementStatus(courseName, 'Attendi il completamento dell’operazione in corso.', 'progress');
+        return;
+    }
 
     renameTarget = { courseName, deck };
     const dialog = document.getElementById('renameStudyDialog');
@@ -1475,7 +1508,7 @@ async function handleStudyRename(event) {
         return;
     }
 
-    await runStudyChange(dialog, async () => {
+    await runStudyChange(dialog, 'Salvataggio del nome…', async () => {
         if (deck) {
             await StorageManager.renameDeck(courseName, deck, newName);
             moveStudyPreference(deckColorKey(courseName, oldName), deckColorKey(courseName, newName));
@@ -1487,6 +1520,7 @@ async function handleStudyRename(event) {
                 }
             }
             if (currentCourse === courseName) restoreRoute(activeRoute);
+            showDeckManagementStatus(courseName, `Deck rinominato in «${newName}».`);
         } else {
             await StorageManager.changeCourse(courseName, course, newName);
             moveStudyPreference(examCountKey(courseName), examCountKey(newName));
@@ -1508,28 +1542,54 @@ async function handleStudyRename(event) {
     });
 }
 
-function openDeleteCourseDialog() {
-    if (fileImportInProgress || studyChangeInProgress) return;
+function openDeleteStudyDialog(courseName, deck = null) {
+    if (fileImportInProgress || studyChangeInProgress) {
+        showDeckManagementStatus(courseName, 'Attendi il completamento dell’operazione in corso.', 'progress');
+        return;
+    }
 
-    deleteCourseTarget = currentCourse;
-    const course = appData.courses[currentCourse];
-    const count = courseQuestionCount(course);
-    const dialog = document.getElementById('deleteCourseDialog');
+    deleteStudyTarget = { courseName, deck };
+    const course = appData.courses[courseName];
+    const dialog = document.getElementById('deleteStudyDialog');
+    const title = deck ? 'Elimina deck' : 'Elimina corso';
+    const description = deck
+        ? `Il deck «${deck.name}» verrà eliminato insieme a ${questionCount(deck.questions.length)}.`
+        : `Il corso «${courseName}» verrà eliminato insieme a ${course.decks.length} deck e ${questionCount(courseQuestionCount(course))}.`;
+    document.getElementById('deleteStudyTitle').textContent = title;
+    document.getElementById('deleteStudyMessage').textContent = `${description} L’operazione è irreversibile.`;
+    dialog.querySelector('button[type="submit"]').textContent = title;
     dialog.querySelector('[role="alert"]').hidden = true;
-    document.getElementById('deleteCourseMessage').textContent =
-        `Il corso «${currentCourse}» verrà eliminato insieme a ${course.decks.length} deck e ${questionCount(count)}. L’operazione è irreversibile.`;
     dialog.showModal();
 }
 
-async function handleCourseDeletion(event) {
+async function handleStudyDeletion(event) {
     event.preventDefault();
     if (studyChangeInProgress) return;
 
     const dialog = event.currentTarget.closest('dialog');
-    const courseName = deleteCourseTarget;
+    const { courseName, deck } = deleteStudyTarget;
     const course = appData.courses[courseName];
 
-    await runStudyChange(dialog, async () => {
+    await runStudyChange(dialog, 'Eliminazione in corso…', async () => {
+        if (deck) {
+            await StorageManager.deleteDeck(courseName, deck);
+            course.decks = course.decks.filter(item => item !== deck);
+            if (!course.decks.some(item => item.name === deck.name)) {
+                localStorage.removeItem(deckColorKey(courseName, deck.name));
+            }
+            for (const [id, attempt] of quizAttempts) {
+                if (attempt.course === courseName && !attempt.deck.exam && attempt.deck.name === deck.name &&
+                    attempt.deck.databaseId === deck.databaseId) {
+                    if (id === activeRoute.attempt) stopStopwatch();
+                    quizAttempts.delete(id);
+                }
+            }
+            if (currentCourse === courseName) restoreRoute(activeRoute);
+            if (activeRoute.view === 'home') renderCourses();
+            showDeckManagementStatus(courseName, `Deck «${deck.name}» eliminato.`);
+            return;
+        }
+
         await StorageManager.changeCourse(courseName, course);
         localStorage.removeItem(examCountKey(courseName));
         course.decks.forEach(deck => localStorage.removeItem(deckColorKey(courseName, deck.name)));
@@ -1548,9 +1608,12 @@ async function handleCourseDeletion(event) {
     });
 }
 
-async function runStudyChange(dialog, change) {
+async function runStudyChange(dialog, progressMessage, change) {
     studyChangeInProgress = true;
     dialog.querySelector('[role="alert"]').hidden = true;
+    const progress = dialog.querySelector('[role="status"]');
+    progress.textContent = progressMessage;
+    progress.hidden = false;
     const unlock = lockDialogControls(dialog);
     try {
         await change();
@@ -1559,9 +1622,19 @@ async function runStudyChange(dialog, change) {
         console.error('Errore durante la modifica della raccolta:', error);
         showStudyChangeError(dialog, error.message);
     } finally {
+        progress.hidden = true;
         unlock();
         studyChangeInProgress = false;
     }
+}
+
+function showDeckManagementStatus(courseName, message, type = 'success') {
+    if (activeRoute.view !== 'deck' || currentCourse !== courseName) return;
+
+    const status = document.getElementById('deckManagementStatus');
+    status.textContent = message;
+    status.className = `import-status ${type}`;
+    status.hidden = false;
 }
 
 function showStudyChangeError(dialog, message) {
@@ -1576,30 +1649,6 @@ function moveStudyPreference(oldKey, newKey) {
 
     localStorage.setItem(newKey, value);
     localStorage.removeItem(oldKey);
-}
-
-async function deleteDeck(courseName, deckName) {
-    if (fileImportInProgress || studyChangeInProgress) return;
-    if (!confirm(`Sei sicuro di voler eliminare il deck "${deckName}"?`)) {
-        return;
-    }
-
-    // Delete from storage
-    const success = await StorageManager.deleteDeck(courseName, deckName);
-
-    if (success) {
-        localStorage.removeItem(deckColorKey(courseName, deckName));
-        // Reload app data
-        appData = await StorageManager.loadAllData();
-
-        if (activeRoute.view === 'deck' && appData.courses[currentCourse]) renderDecks();
-        if (activeRoute.view === 'deck' && !appData.courses[currentCourse]) navigateTo({ view: 'home' });
-
-        // Show notification
-        alert(`Deck "${deckName}" eliminato con successo!`);
-    } else {
-        alert('Errore durante l\'eliminazione del deck.');
-    }
 }
 
 // ===== Code Generator Functions =====

@@ -195,48 +195,21 @@ const SupabaseService = {
         }
     },
 
-    /**
-     * Elimina un deck
-     */
-    async deleteDeck(courseName, deckName) {
-        try {
-            // Trova il corso
-            const { data: courseData, error: courseError } = await supabaseClient
-                .from('courses')
-                .select('id')
-                .eq('name', courseName)
-                .single();
+    async deleteDeck(deckId, deckName) {
+        const { data: deleted, error } = await supabaseClient
+            .from('decks')
+            .delete()
+            .eq('id', deckId)
+            .eq('name', deckName)
+            .eq('is_imported', true)
+            .select('id')
+            .maybeSingle();
 
-            if (courseError) return false;
+        if (error && error.code !== '42501') throw error;
+        if (deleted) return;
 
-            // Elimina il deck (cascade eliminerà domande e risposte)
-            const { error: deleteError } = await supabaseClient
-                .from('decks')
-                .delete()
-                .eq('course_id', courseData.id)
-                .eq('name', deckName);
-
-            if (deleteError) throw deleteError;
-
-            // Controlla se il corso è vuoto e eliminalo se necessario
-            const { count } = await supabaseClient
-                .from('decks')
-                .select('*', { count: 'exact', head: true })
-                .eq('course_id', courseData.id);
-
-            if (count === 0) {
-                await supabaseClient
-                    .from('courses')
-                    .delete()
-                    .eq('id', courseData.id);
-            }
-
-            return true;
-
-        } catch (error) {
-            console.error('Errore durante l\'eliminazione del deck:', error);
-            return false;
-        }
+        // Supporta anche i progetti che usano solo le funzioni di gestione.
+        await this.changeStudyItem('delete_study_deck', deckId, deckName);
     },
 
     /**

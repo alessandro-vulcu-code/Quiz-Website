@@ -72,16 +72,6 @@ const StorageManager = {
         return allData;
     },
 
-    /**
-     * Delete an imported deck
-     */
-    /**
-     * Delete an imported deck from Supabase
-     */
-    async deleteDeck(courseName, deckName) {
-        return await SupabaseService.deleteDeck(courseName, deckName);
-    },
-
     async changeCourse(courseName, course, newName = null) {
         const imported = this.getImportedData();
         const localCourse = Object.hasOwn(imported, courseName) ? imported[courseName] : null;
@@ -120,13 +110,30 @@ const StorageManager = {
             return;
         }
 
+        this.changeLocalDeck(courseName, deck.name, newName);
+    },
+
+    async deleteDeck(courseName, deck) {
+        if (deck.databaseId) {
+            await SupabaseService.deleteDeck(deck.databaseId, deck.name);
+            return;
+        }
+
+        this.changeLocalDeck(courseName, deck.name);
+    },
+
+    changeLocalDeck(courseName, deckName, newName = null) {
         const imported = this.getImportedData();
         const localDecks = Object.hasOwn(imported, courseName) ? imported[courseName].decks : [];
-        const matches = localDecks.filter(localDeck => localDeck.name === deck.name);
+        const matches = localDecks.filter(localDeck => localDeck.name === deckName);
         if (matches.length !== 1) throw new Error('Il deck è cambiato. Ricarica la pagina e riprova.');
-        if (localDecks.some(localDeck => localDeck.name === newName)) throw new Error('Questo nome è già in uso.');
 
-        matches[0].name = newName;
+        if (newName === null) {
+            localDecks.splice(localDecks.indexOf(matches[0]), 1);
+        } else {
+            if (localDecks.some(localDeck => localDeck.name === newName)) throw new Error('Questo nome è già in uso.');
+            matches[0].name = newName;
+        }
         this.setImportedData(imported);
     },
 
