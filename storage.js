@@ -50,7 +50,7 @@ const StorageManager = {
         const supabaseData = await SupabaseService.fetchFullStudyData();
 
         const allData = {
-            courses: supabaseData.courses || {}
+            courses: Object.assign(Object.create(null), supabaseData.courses)
         };
 
         // Merge with imported data
@@ -80,6 +80,54 @@ const StorageManager = {
      */
     async deleteDeck(courseName, deckName) {
         return await SupabaseService.deleteDeck(courseName, deckName);
+    },
+
+    async changeCourse(courseName, course, newName = null) {
+        const imported = this.getImportedData();
+        const localCourse = Object.hasOwn(imported, courseName) ? imported[courseName] : null;
+        if (localCourse) {
+            if (newName !== null && Object.hasOwn(imported, newName)) throw new Error('Questo nome è già in uso.');
+
+            const updated = Object.assign(Object.create(null), imported);
+            delete updated[courseName];
+            if (newName !== null) updated[newName] = localCourse;
+            this.setImportedData(updated);
+        }
+
+        if (!course.databaseId) return;
+        try {
+            if (newName === null) {
+                await SupabaseService.changeStudyItem('delete_study_course', course.databaseId, courseName);
+            } else {
+                await SupabaseService.changeStudyItem('rename_study_course', course.databaseId, courseName, newName);
+            }
+        } catch (error) {
+            if (localCourse) {
+                const latest = Object.assign(Object.create(null), this.getImportedData());
+                if (newName !== null && JSON.stringify(latest[newName]) === JSON.stringify(localCourse)) {
+                    delete latest[newName];
+                }
+                if (!Object.hasOwn(latest, courseName)) latest[courseName] = localCourse;
+                this.setImportedData(latest);
+            }
+            throw error;
+        }
+    },
+
+    async renameDeck(courseName, deck, newName) {
+        if (deck.databaseId) {
+            await SupabaseService.changeStudyItem('rename_study_deck', deck.databaseId, deck.name, newName);
+            return;
+        }
+
+        const imported = this.getImportedData();
+        const localDecks = Object.hasOwn(imported, courseName) ? imported[courseName].decks : [];
+        const matches = localDecks.filter(localDeck => localDeck.name === deck.name);
+        if (matches.length !== 1) throw new Error('Il deck è cambiato. Ricarica la pagina e riprova.');
+        if (localDecks.some(localDeck => localDeck.name === newName)) throw new Error('Questo nome è già in uso.');
+
+        matches[0].name = newName;
+        this.setImportedData(imported);
     },
 
     /**

@@ -11,6 +11,10 @@ let quizCompleted = false; // Track if quiz is finished
 let activeRoute = { view: 'home' };
 const quizAttempts = new Map();
 let deckColorTarget = null;
+let fileImportInProgress = false;
+let studyChangeInProgress = false;
+let renameTarget = null;
+let deleteCourseTarget = null;
 
 // Stopwatch state
 let stopwatchInterval = null;
@@ -52,10 +56,12 @@ const elements = {
 
 // ===== Navigation Functions =====
 function sameRoute(first, second) {
-    return first?.view === second.view && first.course === second.course && first.attempt === second.attempt;
+    const sameCourse = first?.courseId && second.courseId ? first.courseId === second.courseId : first?.course === second.course;
+    return first?.view === second.view && sameCourse && first.attempt === second.attempt;
 }
 
 function navigateTo(route, { back = false } = {}) {
+    if (route.course) route = { ...route, courseId: appData.courses[route.course]?.databaseId };
     if (sameRoute(activeRoute, route)) return;
 
     if (back && sameRoute(history.state?.studyHub?.previous, route)) {
@@ -68,9 +74,10 @@ function navigateTo(route, { back = false } = {}) {
 }
 
 function restoreRoute(route) {
-    if (activeRoute.attempt) {
+    const activeAttempt = quizAttempts.get(activeRoute.attempt);
+    if (activeAttempt) {
         stopStopwatch();
-        Object.assign(quizAttempts.get(activeRoute.attempt), {
+        Object.assign(activeAttempt, {
             questionIndex: currentQuestionIndex,
             answers: userAnswers,
             elapsed: stopwatchElapsed,
@@ -78,10 +85,18 @@ function restoreRoute(route) {
         });
     }
 
-    if (route.course && !Object.hasOwn(appData.courses, route.course)) {
-        route = { view: 'home' };
-    } else if (route.attempt && !quizAttempts.has(route.attempt)) {
-        route = { view: 'deck', course: route.course };
+    if (route.course) {
+        const courseName = route.courseId
+            ? Object.keys(appData.courses).find(name => appData.courses[name].databaseId === route.courseId)
+            : route.course;
+        if (courseName === undefined || !Object.hasOwn(appData.courses, courseName)) {
+            route = { view: 'home' };
+        } else {
+            const courseId = appData.courses[courseName].databaseId;
+            route = route.attempt && !quizAttempts.has(route.attempt)
+                ? { view: 'deck', course: courseName, courseId }
+                : { ...route, course: courseName, courseId };
+        }
     }
 
     activeRoute = route;
@@ -193,10 +208,12 @@ function setupEventListeners() {
     document.getElementById('restartQuiz').addEventListener('click', restartQuiz);
 
     // Import modal handlers
-    document.getElementById('importButton').addEventListener('click', openImportModal);
+    document.getElementById('importButton').addEventListener('click', () => openImportModal());
+    document.getElementById('importCourseQuizButton').addEventListener('click', () => openImportModal(currentCourse));
     document.getElementById('closeImportModal').addEventListener('click', closeImportModal);
     document.getElementById('cancelImport').addEventListener('click', closeImportModal);
     document.getElementById('importForm').addEventListener('submit', handleImportSubmit);
+    document.getElementById('quizFile').addEventListener('change', updateImportDeckName);
 
     // Code generator handlers
     document.getElementById('generateCodeButton').addEventListener('click', generateDataCode);
@@ -225,6 +242,14 @@ function setupEventListeners() {
     document.getElementById('cancelExamSettings').addEventListener('click', closeExamSettingsModal);
     document.getElementById('saveExamSettings').addEventListener('click', saveExamSettings);
     document.querySelector('#deckColorDialog form').addEventListener('submit', saveDeckColor);
+    document.querySelector('#startExamDialog form').addEventListener('submit', submitExamStart);
+    document.getElementById('renameCourseButton').addEventListener('click', () => openRenameStudyDialog(currentCourse));
+    document.querySelector('#renameStudyDialog form').addEventListener('submit', handleStudyRename);
+    document.getElementById('deleteCourseButton').addEventListener('click', openDeleteCourseDialog);
+    document.querySelector('#deleteCourseDialog form').addEventListener('submit', handleCourseDeletion);
+    document.querySelectorAll('[data-close-dialog]').forEach(button => {
+        button.addEventListener('click', () => button.closest('dialog').close());
+    });
 }
 
 // ===== Course & Deck Rendering =====
@@ -239,7 +264,7 @@ function renderCourses() {
     courseNames.forEach(courseName => {
         const course = appData.courses[courseName];
         const deckCount = course.decks.length;
-        const totalQuestions = course.decks.reduce((sum, deck) => sum + deck.questions.length, 0);
+        const totalQuestions = courseQuestionCount(course);
 
         const courseCard = createStudyRow(
             courseName,
@@ -256,6 +281,10 @@ function selectCourse(courseName) {
 
 function questionCount(count) {
     return count === 1 ? '1 domanda' : `${count} domande`;
+}
+
+function courseQuestionCount(course) {
+    return course.decks.reduce((sum, deck) => sum + deck.questions.length, 0);
 }
 
 function createStudyRow(title, description, onClick) {
@@ -317,15 +346,14 @@ function renderDecks() {
     examSlot.replaceChildren();
     const course = appData.courses[currentCourse];
 
-    const totalQuestions = course.decks.reduce((sum, deck) => sum + deck.questions.length, 0);
+    const totalQuestions = courseQuestionCount(course);
     const examSettingsButton = document.getElementById('examSettingsButton');
-    examSettingsButton.style.display = totalQuestions >= 50 ? 'inline-flex' : 'none';
+    examSettingsButton.style.display = totalQuestions > 0 ? 'inline-flex' : 'none';
 
-    if (totalQuestions >= 50) {
-        const examButton = createStudyRow('Simulazione d’esame', '50 domande casuali', startExamMode);
-        examButton.classList.add('exam-deck');
-        examSlot.appendChild(examButton);
-    }
+    const examButton = createStudyRow('Simulazione d’esame', `${questionCount(totalQuestions)} disponibili`, openStartExamDialog);
+    examButton.classList.add('exam-deck');
+    examButton.setAttribute('aria-haspopup', 'dialog');
+    examSlot.appendChild(examButton);
 
     if (course.decks.length === 0) {
         elements.deckList.innerHTML = '<p class="loading">Nessun deck disponibile.</p>';
@@ -340,6 +368,17 @@ function renderDecks() {
         deckButton.disabled = deck.questions.length === 0;
         row.appendChild(deckButton);
 
+        const actions = document.createElement('div');
+        actions.className = 'deck-actions';
+        const renameButton = document.createElement('button');
+        renameButton.className = 'rename-btn';
+        renameButton.type = 'button';
+        renameButton.textContent = 'Rinomina';
+        renameButton.setAttribute('aria-label', `Rinomina deck ${deck.name}`);
+        renameButton.setAttribute('aria-haspopup', 'dialog');
+        renameButton.addEventListener('click', () => openRenameStudyDialog(currentCourse, deck));
+        actions.appendChild(renameButton);
+
         if (deck.imported) {
             const deleteButton = document.createElement('button');
             deleteButton.className = 'delete-btn';
@@ -347,9 +386,10 @@ function renderDecks() {
             deleteButton.textContent = 'Elimina';
             deleteButton.setAttribute('aria-label', `Elimina deck ${deck.name}`);
             deleteButton.addEventListener('click', () => deleteDeck(currentCourse, deck.name));
-            row.appendChild(deleteButton);
+            actions.appendChild(deleteButton);
         }
 
+        row.appendChild(actions);
         elements.deckList.appendChild(row);
     });
 }
@@ -367,6 +407,7 @@ function startQuizAttempt(deck) {
     // Keep IDs distinct from history entries left over after a page reload.
     const attempt = crypto.getRandomValues(new Uint32Array(2)).join('-');
     quizAttempts.set(attempt, {
+        course: currentCourse,
         deck,
         questions,
         questionIndex: 0,
@@ -378,67 +419,97 @@ function startQuizAttempt(deck) {
 }
 
 // ===== Exam Mode =====
-async function startExamMode() {
+function examCountKey(courseName) {
+    return `studyHub:examCount:${JSON.stringify(courseName)}`;
+}
+
+function openStartExamDialog() {
+    const dialog = document.getElementById('startExamDialog');
+    if (dialog.hasAttribute('aria-busy') || fileImportInProgress || studyChangeInProgress) return;
+
+    const input = document.getElementById('examQuestionCount');
+    const count = courseQuestionCount(appData.courses[currentCourse]);
+    const savedCount = Number(localStorage.getItem(examCountKey(currentCourse)));
+    const preferredCount = Number.isInteger(savedCount) && savedCount > 0 ? savedCount : 50;
+
+    input.max = count;
+    input.value = count > 0 ? Math.min(preferredCount, count) : '';
+    input.disabled = count === 0;
+    dialog.querySelector('button[type="submit"]').disabled = count === 0;
+    document.getElementById('examQuestionLimit').textContent = count > 0
+        ? `${questionCount(count)} disponibili nel corso.`
+        : 'Aggiungi almeno una domanda per iniziare la simulazione.';
+    dialog.showModal();
+}
+
+async function submitExamStart(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const input = document.getElementById('examQuestionCount');
+    if (input.disabled || !input.reportValidity()) return;
+
     const origin = activeRoute;
-    const course = appData.courses[currentCourse];
-    const totalQuestionsTarget = 50;
+    const total = input.valueAsNumber;
+    const dialog = form.closest('dialog');
+    const unlock = lockDialogControls(dialog);
 
-    // Load saved exam settings from Supabase
-    let savedSettings = {};
     try {
-        savedSettings = await SupabaseService.loadExamSettings(currentCourse);
-    } catch (e) {
-        console.warn('Could not load exam settings, using equal distribution:', e);
+        const settings = await SupabaseService.loadExamSettings(origin.course);
+        if (activeRoute !== origin || !dialog.open) return;
+
+        const decks = appData.courses[origin.course].decks;
+        const questions = selectExamQuestions(decks, settings, total);
+        localStorage.setItem(examCountKey(origin.course), String(total));
+        dialog.close();
+        startQuizAttempt({ name: 'Simulazione d’esame', questions, exam: true });
+    } finally {
+        unlock();
     }
+}
 
-    if (activeRoute !== origin) return;
-
-    // Check if we have valid saved settings (sum = 100)
-    const savedSum = Object.values(savedSettings).reduce((s, v) => s + v, 0);
-    const hasValidSettings = savedSum === 100 && Object.keys(savedSettings).length > 0;
-
-    let examQuestions = [];
-
-    if (hasValidSettings) {
-        // Use saved percentages to pick from each deck
-        course.decks.forEach(deck => {
-            const pct = savedSettings[deck.name] || 0;
-            if (pct <= 0) return;
-
-            const numFromDeck = Math.round((pct / 100) * totalQuestionsTarget);
-            if (numFromDeck <= 0) return;
-
-            // Copy and shuffle the deck's questions
-            const deckQuestions = deck.questions.map(q => ({ ...q }));
-            for (let i = deckQuestions.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [deckQuestions[i], deckQuestions[j]] = [deckQuestions[j], deckQuestions[i]];
-            }
-
-            // Take the required number (or all if less available)
-            examQuestions = examQuestions.concat(deckQuestions.slice(0, Math.min(numFromDeck, deckQuestions.length)));
-        });
-    } else {
-        // Fallback: equal distribution from all decks
-        let allQuestions = [];
-        course.decks.forEach(deck => {
-            allQuestions = allQuestions.concat(deck.questions.map(q => ({ ...q })));
-        });
-        // Shuffle all
-        for (let i = allQuestions.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [allQuestions[i], allQuestions[j]] = [allQuestions[j], allQuestions[i]];
-        }
-        examQuestions = allQuestions.slice(0, Math.min(totalQuestionsTarget, allQuestions.length));
-    }
-
-    // Final shuffle of all selected questions
-    for (let i = examQuestions.length - 1; i > 0; i--) {
+function shuffleQuestions(questions) {
+    const shuffled = [...questions];
+    for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [examQuestions[i], examQuestions[j]] = [examQuestions[j], examQuestions[i]];
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
+function selectExamQuestions(decks, settings, total) {
+    const pools = decks.map(deck => ({
+        questions: deck.questions,
+        weight: Object.hasOwn(settings, deck.name) ? settings[deck.name] : 0
+    }));
+
+    if (pools.reduce((sum, pool) => sum + pool.weight, 0) !== 100) {
+        return shuffleQuestions(decks.flatMap(deck => deck.questions)).slice(0, total);
     }
 
-    startQuizAttempt({ name: 'Simulazione d’esame', questions: examQuestions });
+    const weighted = pools.filter(pool => pool.weight > 0).map(pool => ({
+        questions: shuffleQuestions(pool.questions),
+        remainingQuota: total * pool.weight / 100
+    }));
+    const selected = [];
+    while (selected.length < total) {
+        let nextPool;
+        for (const pool of weighted) {
+            if (pool.questions.length && (!nextPool || pool.remainingQuota > nextPool.remainingQuota)) {
+                nextPool = pool;
+            }
+        }
+        if (!nextPool) break;
+
+        selected.push(nextPool.questions.pop());
+        nextPool.remainingQuota--;
+    }
+
+    // Esauriti i deck con una quota, completa l'esame con le domande ancora disponibili.
+    if (selected.length < total) {
+        const remaining = pools.filter(pool => pool.weight === 0).flatMap(pool => pool.questions);
+        selected.push(...shuffleQuestions(remaining).slice(0, total - selected.length));
+    }
+    return shuffleQuestions(selected);
 }
 
 // ===== Exam Settings Modal Functions =====
@@ -466,7 +537,7 @@ async function openExamSettingsModal() {
     // Build the UI for each deck
     container.innerHTML = '';
     course.decks.forEach(deck => {
-        const savedPct = savedSettings[deck.name] !== undefined ? savedSettings[deck.name] : 0;
+        const savedPct = Object.hasOwn(savedSettings, deck.name) ? savedSettings[deck.name] : 0;
 
         const item = document.createElement('div');
         item.className = 'exam-settings-item';
@@ -525,7 +596,7 @@ function updateExamTotal() {
 
 async function saveExamSettings() {
     const inputs = document.querySelectorAll('.exam-pct-input');
-    const settingsMap = {};
+    const settingsMap = Object.create(null);
     let total = 0;
 
     inputs.forEach(input => {
@@ -969,17 +1040,15 @@ function generateReview() {
 }
 
 // ===== Import Modal Functions =====
-function openImportModal() {
-    const modal = document.getElementById('importModal');
-    modal.showModal();
+function openImportModal(courseName = '') {
+    if (fileImportInProgress || studyChangeInProgress) return;
 
-    // Reset form
+    const modal = document.getElementById('importModal');
     document.getElementById('importForm').reset();
     document.getElementById('importStatus').style.display = 'none';
-    document.getElementById('newCourseGroup').style.display = 'none';
-
-    // Populate course select
-    populateCourseSelect();
+    populateCourseSelect(courseName);
+    updateImportDeckName();
+    modal.showModal();
 }
 
 function closeImportModal() {
@@ -987,80 +1056,138 @@ function closeImportModal() {
     modal.close();
 }
 
+function updateImportDeckName() {
+    const multipleFiles = document.getElementById('quizFile').files.length > 1;
+    document.getElementById('deckNameGroup').hidden = multipleFiles;
+    document.getElementById('deckName').required = !multipleFiles;
+}
+
 async function handleImportSubmit(event) {
     event.preventDefault();
+    if (fileImportInProgress || studyChangeInProgress) return;
 
+    const form = event.currentTarget;
     const courseSelect = document.getElementById('courseSelect');
-    const courseNameInput = document.getElementById('courseName');
-    const deckName = document.getElementById('deckName').value.trim();
+    const isNewCourse = courseSelect.selectedOptions[0]?.hasAttribute('data-new-course');
+    const courseName = isNewCourse ? document.getElementById('courseName').value.trim() : courseSelect.value;
     const fileInput = document.getElementById('quizFile');
+    const files = Array.from(fileInput.files);
+    const deckNameInput = document.getElementById('deckName');
 
-    // Determine course name
-    let courseName;
-    if (courseSelect.value === '__new__') {
-        courseName = courseNameInput.value.trim();
-        if (!courseName) {
-            showStatus('Inserisci il nome del nuovo corso', 'error');
+    if (!courseName) {
+        showStatus(isNewCourse ? 'Inserisci il nome del nuovo corso' : 'Seleziona un corso', 'error');
+        return;
+    }
+    if (files.length === 0) {
+        showStatus('Seleziona almeno un file', 'error');
+        return;
+    }
+
+    const decks = files.map(file => ({
+        file,
+        name: files.length === 1 ? deckNameInput.value.trim() : file.name.replace(/\.[^.]+$/, '').trim()
+    }));
+    const deckNames = new Set((appData.courses[courseName]?.decks ?? []).map(deck => deck.name));
+    for (const { file, name } of decks) {
+        if (!name) {
+            showStatus(`«${file.name}» · Inserisci un nome per il deck.`, 'error');
             return;
         }
-    } else if (courseSelect.value) {
-        courseName = courseSelect.value;
-    } else {
-        showStatus('Seleziona un corso', 'error');
-        return;
+        if (deckNames.has(name)) {
+            showStatus(`«${file.name}» · Il nome del deck «${name}» è già in uso.`, 'error');
+            return;
+        }
+        deckNames.add(name);
     }
 
-    if (!fileInput.files || fileInput.files.length === 0) {
-        showStatus('Seleziona un file', 'error');
-        return;
-    }
-
-    const file = fileInput.files[0];
-
+    const unlock = lockFileImport(form);
+    showStatus('Importazione in corso…', 'progress');
+    let savedDecks = 0;
+    let savedQuestions = 0;
     try {
-        // Read file content
-        const fileContent = await readFileAsText(file);
-
-        // Parse file
-        const questions = FileParser.parseFile(fileContent, file.name);
-
-        // Validate questions
-        const validation = FileParser.validateQuestions(questions);
-        if (!validation.valid) {
-            showStatus(`Errore: ${validation.error}`, 'error');
-            return;
+        for (const deck of decks) {
+            deck.questions = await readQuizFile(deck.file);
+        }
+        for (const { file, name, questions } of decks) {
+            try {
+                await StorageManager.saveQuizData(courseName, name, questions);
+            } catch (error) {
+                throw new Error(`«${file.name}» · ${error.message}`);
+            }
+            savedDecks++;
+            savedQuestions += questions.length;
         }
 
-        // Save to storage
-        await StorageManager.saveQuizData(courseName, deckName, questions);
-
-        // Reload app data
-        appData = await StorageManager.loadAllData();
-
-        // Re-render courses
-        renderCourses();
-
-        // Show success message
-        showStatus(`✓ Importato con successo! ${validation.questionCount} domande aggiunte.`, 'success');
-
-        // Close modal after delay
-        setTimeout(() => {
-            closeImportModal();
-        }, 2000);
-
+        if (form.closest('dialog').open) {
+            fileInput.value = '';
+            updateImportDeckName();
+            showStatus(`✓ Deck importati: ${savedDecks} · ${questionCount(savedQuestions)}`, 'success');
+        }
     } catch (error) {
         console.error('Import error:', error);
-        showStatus(`Errore: ${error.message}`, 'error');
+        if (savedDecks > 0) {
+            const remaining = decks.slice(savedDecks);
+            const selection = new DataTransfer();
+            remaining.forEach(deck => selection.items.add(deck.file));
+            fileInput.files = selection.files;
+            deckNameInput.value = remaining.length === 1 ? remaining[0].name : '';
+            updateImportDeckName();
+        }
+        showStatus(`Deck importati: ${savedDecks} su ${decks.length}. ${error.message}`, 'error');
+    } finally {
+        try {
+            if (savedDecks > 0) await refreshFileImportData();
+            if (savedDecks === decks.length && form.closest('dialog').open) closeAfterFileImport(form);
+        } finally {
+            unlock();
+        }
     }
 }
 
-function readFileAsText(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.onerror = (e) => reject(new Error('Errore durante la lettura del file'));
-        reader.readAsText(file);
-    });
+async function readQuizFile(file) {
+    try {
+        const questions = FileParser.parseFile(await file.text(), file.name);
+        const validation = FileParser.validateQuestions(questions);
+        if (!validation.valid) throw new Error(validation.error);
+        return questions;
+    } catch (error) {
+        throw new Error(`«${file.name}» · ${error.message}`);
+    }
+}
+
+function lockFileImport(form) {
+    fileImportInProgress = true;
+    const unlock = lockDialogControls(form.closest('dialog'));
+    return () => {
+        unlock();
+        fileImportInProgress = false;
+    };
+}
+
+function lockDialogControls(dialog) {
+    const controls = dialog.querySelectorAll('button:enabled, input:enabled, select:enabled, textarea:enabled');
+    const preventCancel = event => event.preventDefault();
+    dialog.setAttribute('aria-busy', 'true');
+    controls.forEach(control => { control.disabled = true; });
+    dialog.addEventListener('cancel', preventCancel);
+
+    return () => {
+        controls.forEach(control => { control.disabled = false; });
+        dialog.removeEventListener('cancel', preventCancel);
+        dialog.removeAttribute('aria-busy');
+    };
+}
+
+async function refreshFileImportData() {
+    appData = await StorageManager.loadAllData();
+    if (activeRoute.view === 'deck' && appData.courses[currentCourse]) renderDecks();
+    if (activeRoute.view === 'home') renderCourses();
+}
+
+function closeAfterFileImport(form) {
+    const dialog = form.closest('dialog');
+    const closeTimer = setTimeout(() => dialog.close(), 2000);
+    dialog.addEventListener('close', () => clearTimeout(closeTimer), { once: true });
 }
 
 function showStatus(message, type) {
@@ -1071,14 +1198,17 @@ function showStatus(message, type) {
 }
 
 // ===== Course Select Population =====
-function populateCourseSelect() {
+function populateCourseSelect(courseName) {
     const courseSelect = document.getElementById('courseSelect');
 
     // Keep the default options
     courseSelect.innerHTML = `
         <option value="">-- Seleziona un corso esistente --</option>
-        <option value="__new__">+ Crea nuovo corso</option>
+        <option data-new-course>+ Crea nuovo corso</option>
     `;
+    let newCourseValue = '__new__';
+    while (Object.hasOwn(appData.courses, newCourseValue)) newCourseValue += '_';
+    courseSelect.querySelector('[data-new-course]').value = newCourseValue;
 
     // Add existing courses
     const courses = Object.keys(appData.courses).sort();
@@ -1094,7 +1224,7 @@ function populateCourseSelect() {
         const newCourseGroup = document.getElementById('newCourseGroup');
         const courseNameInput = document.getElementById('courseName');
 
-        if (this.value === '__new__') {
+        if (this.selectedOptions[0]?.hasAttribute('data-new-course')) {
             newCourseGroup.style.display = 'block';
             courseNameInput.required = true;
         } else {
@@ -1102,10 +1232,14 @@ function populateCourseSelect() {
             courseNameInput.required = false;
         }
     };
+    courseSelect.value = courseName;
+    courseSelect.onchange();
 }
 
 // ===== Add Questions Modal Functions =====
 function openAddQuestionsModal() {
+    if (fileImportInProgress || studyChangeInProgress) return;
+
     if (!currentCourse) {
         alert('Seleziona prima un corso!');
         return;
@@ -1252,6 +1386,9 @@ async function handleManualQuestionSubmit(event) {
 
 async function handleImportQuestionsSubmit(event) {
     event.preventDefault();
+    if (fileImportInProgress || studyChangeInProgress) return;
+
+    const form = event.currentTarget;
     const origin = activeRoute;
 
     const deckName = document.getElementById('targetDeckSelect').value;
@@ -1260,55 +1397,34 @@ async function handleImportQuestionsSubmit(event) {
         return;
     }
 
-    const fileInput = document.getElementById('questionsFile');
-    if (!fileInput.files || fileInput.files.length === 0) {
-        showAddStatus('Seleziona un file', 'error', 'import');
+    const files = Array.from(document.getElementById('questionsFile').files);
+    if (files.length === 0) {
+        showAddStatus('Seleziona almeno un file', 'error', 'import');
         return;
     }
 
-    const file = fileInput.files[0];
-
+    const unlock = lockFileImport(form);
+    showAddStatus('Importazione in corso…', 'progress', 'import');
     try {
-        // Read file content
-        const fileContent = await readFileAsText(file);
-
-        // Parse file
-        const questions = FileParser.parseFile(fileContent, file.name);
-
-        // Validate questions
-        const validation = FileParser.validateQuestions(questions);
-        if (!validation.valid) {
-            showAddStatus(`Errore: ${validation.error}`, 'error', 'import');
-            return;
+        const questionSets = [];
+        for (const file of files) {
+            questionSets.push(await readQuizFile(file));
         }
-
-        // Add to storage
+        const questions = questionSets.flat();
         await StorageManager.addQuestionsToDeck(origin.course, deckName, questions);
+        form.reset();
 
-        // Reload app data
-        appData = await StorageManager.loadAllData();
+        await refreshFileImportData();
+        if (!form.closest('dialog').open) return;
 
-        if (activeRoute.view === 'deck') renderDecks();
-        if (activeRoute !== origin) return;
-
-        // Get new total count
-        const updatedDeck = appData.courses[origin.course].decks.find(d => d.name === deckName);
-        const totalQuestions = updatedDeck ? updatedDeck.questions.length : 'N/A';
-
-        // Show success
-        showAddStatus(`✓ Importate ${validation.questionCount} domande! Il deck ora ha ${totalQuestions} domande.`, 'success', 'import');
-
-        // Reset form
-        document.getElementById('importQuestionsForm').reset();
-
-        // Close modal after delay
-        setTimeout(() => {
-            if (activeRoute === origin) closeAddQuestionsModal();
-        }, 2000);
+        showAddStatus(`✓ Aggiunte ${questionCount(questions.length)} al deck «${deckName}».`, 'success', 'import');
+        closeAfterFileImport(form);
 
     } catch (error) {
         console.error('Import error:', error);
         showAddStatus(`Errore: ${error.message}`, 'error', 'import');
+    } finally {
+        unlock();
     }
 }
 
@@ -1319,8 +1435,151 @@ function showAddStatus(message, type, tab) {
     statusDiv.style.display = 'block';
 }
 
-// ===== Delete Functions =====
+// ===== Course and Deck Management =====
+function openRenameStudyDialog(courseName, deck = null) {
+    if (fileImportInProgress || studyChangeInProgress) return;
+
+    renameTarget = { courseName, deck };
+    const dialog = document.getElementById('renameStudyDialog');
+    const input = document.getElementById('studyName');
+    document.getElementById('renameStudyTitle').textContent = deck ? 'Rinomina deck' : 'Rinomina corso';
+    dialog.querySelector('[role="alert"]').hidden = true;
+    input.value = deck ? deck.name : courseName;
+    dialog.showModal();
+    input.select();
+}
+
+async function handleStudyRename(event) {
+    event.preventDefault();
+    if (studyChangeInProgress) return;
+
+    const dialog = event.currentTarget.closest('dialog');
+    const { courseName, deck } = renameTarget;
+    const oldName = deck ? deck.name : courseName;
+    const newName = document.getElementById('studyName').value.trim();
+    const course = appData.courses[courseName];
+
+    if (!newName) {
+        showStudyChangeError(dialog, 'Inserisci un nome.');
+        return;
+    }
+    if (newName === oldName) {
+        dialog.close();
+        return;
+    }
+    const nameInUse = deck
+        ? course.decks.some(otherDeck => otherDeck.name === newName)
+        : Object.hasOwn(appData.courses, newName);
+    if (nameInUse) {
+        showStudyChangeError(dialog, 'Questo nome è già in uso.');
+        return;
+    }
+
+    await runStudyChange(dialog, async () => {
+        if (deck) {
+            await StorageManager.renameDeck(courseName, deck, newName);
+            moveStudyPreference(deckColorKey(courseName, oldName), deckColorKey(courseName, newName));
+            deck.name = newName;
+            for (const attempt of quizAttempts.values()) {
+                if (attempt.course === courseName && !attempt.deck.exam && attempt.deck.name === oldName &&
+                    attempt.deck.databaseId === deck.databaseId) {
+                    attempt.deck.name = newName;
+                }
+            }
+            if (currentCourse === courseName) restoreRoute(activeRoute);
+        } else {
+            await StorageManager.changeCourse(courseName, course, newName);
+            moveStudyPreference(examCountKey(courseName), examCountKey(newName));
+            course.decks.forEach(item => moveStudyPreference(deckColorKey(courseName, item.name), deckColorKey(newName, item.name)));
+            appData.courses[newName] = course;
+            delete appData.courses[courseName];
+            for (const attempt of quizAttempts.values()) {
+                if (attempt.course === courseName) attempt.course = newName;
+            }
+
+            const renameRoute = route => route?.course === courseName ? { ...route, course: newName } : route;
+            const entry = history.state?.studyHub;
+            if (entry) {
+                history.replaceState({ studyHub: { route: renameRoute(entry.route), previous: renameRoute(entry.previous) } }, '');
+            }
+            if (currentCourse === courseName) restoreRoute(renameRoute(activeRoute));
+            if (activeRoute.view === 'home') renderCourses();
+        }
+    });
+}
+
+function openDeleteCourseDialog() {
+    if (fileImportInProgress || studyChangeInProgress) return;
+
+    deleteCourseTarget = currentCourse;
+    const course = appData.courses[currentCourse];
+    const count = courseQuestionCount(course);
+    const dialog = document.getElementById('deleteCourseDialog');
+    dialog.querySelector('[role="alert"]').hidden = true;
+    document.getElementById('deleteCourseMessage').textContent =
+        `Il corso «${currentCourse}» verrà eliminato insieme a ${course.decks.length} deck e ${questionCount(count)}. L’operazione è irreversibile.`;
+    dialog.showModal();
+}
+
+async function handleCourseDeletion(event) {
+    event.preventDefault();
+    if (studyChangeInProgress) return;
+
+    const dialog = event.currentTarget.closest('dialog');
+    const courseName = deleteCourseTarget;
+    const course = appData.courses[courseName];
+
+    await runStudyChange(dialog, async () => {
+        await StorageManager.changeCourse(courseName, course);
+        localStorage.removeItem(examCountKey(courseName));
+        course.decks.forEach(deck => localStorage.removeItem(deckColorKey(courseName, deck.name)));
+        delete appData.courses[courseName];
+
+        if (currentCourse === courseName) {
+            const route = { view: 'home' };
+            history.replaceState({ studyHub: { route } }, '');
+            restoreRoute(route);
+        } else if (activeRoute.view === 'home') {
+            renderCourses();
+        }
+        for (const [id, attempt] of quizAttempts) {
+            if (attempt.course === courseName) quizAttempts.delete(id);
+        }
+    });
+}
+
+async function runStudyChange(dialog, change) {
+    studyChangeInProgress = true;
+    dialog.querySelector('[role="alert"]').hidden = true;
+    const unlock = lockDialogControls(dialog);
+    try {
+        await change();
+        dialog.close();
+    } catch (error) {
+        console.error('Errore durante la modifica della raccolta:', error);
+        showStudyChangeError(dialog, error.message);
+    } finally {
+        unlock();
+        studyChangeInProgress = false;
+    }
+}
+
+function showStudyChangeError(dialog, message) {
+    const status = dialog.querySelector('[role="alert"]');
+    status.textContent = message;
+    status.hidden = false;
+}
+
+function moveStudyPreference(oldKey, newKey) {
+    const value = localStorage.getItem(oldKey);
+    if (value === null) return;
+
+    localStorage.setItem(newKey, value);
+    localStorage.removeItem(oldKey);
+}
+
 async function deleteDeck(courseName, deckName) {
+    if (fileImportInProgress || studyChangeInProgress) return;
     if (!confirm(`Sei sicuro di voler eliminare il deck "${deckName}"?`)) {
         return;
     }
@@ -1333,7 +1592,8 @@ async function deleteDeck(courseName, deckName) {
         // Reload app data
         appData = await StorageManager.loadAllData();
 
-        if (activeRoute.view === 'deck') renderDecks();
+        if (activeRoute.view === 'deck' && appData.courses[currentCourse]) renderDecks();
+        if (activeRoute.view === 'deck' && !appData.courses[currentCourse]) navigateTo({ view: 'home' });
 
         // Show notification
         alert(`Deck "${deckName}" eliminato con successo!`);

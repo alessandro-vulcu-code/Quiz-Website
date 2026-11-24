@@ -46,8 +46,11 @@
                     <button class="back-button" id="backToCourses">← Tutti i corsi</button>
                     <h2 id="courseTitle" tabindex="-1"></h2>
                     <div class="button-group">
+                        <button class="btn btn-import" id="importCourseQuizButton">Importa quiz</button>
                         <button class="btn btn-primary" id="addQuestionsButton">Aggiungi domande</button>
                         <button class="btn btn-secondary" id="examSettingsButton" style="display: none;">Impostazioni esame</button>
+                        <button class="btn btn-secondary" id="renameCourseButton" aria-haspopup="dialog">Rinomina corso</button>
+                        <button class="btn btn-danger" id="deleteCourseButton" aria-haspopup="dialog">Elimina corso</button>
                     </div>
                 </div>
                 <div id="examSlot"></div>
@@ -159,17 +162,18 @@
                             <input type="text" id="courseName" placeholder="es. Sistemi Operativi">
                         </div>
                         <div class="form-group">
-                            <label for="deckName">Nome Deck</label>
-                            <input type="text" id="deckName" placeholder="es. Chapter 2" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="quizFile">File Quiz (.txt, .csv o .json)</label>
-                            <input type="file" id="quizFile" accept=".txt,.csv,.json" required>
-                            <small class="form-help">
+                            <label for="quizFile">File quiz (.txt, .csv o .json)</label>
+                            <input type="file" id="quizFile" accept=".txt,.csv,.json" aria-describedby="quizFileHelp" multiple required>
+                            <small class="form-help" id="quizFileHelp">
+                                Puoi selezionare più file. Ogni file crea un deck con il nome del file.<br>
                                 Formato .txt: Domanda;Risposta1;Risposta2;Risposta3;Risposta4;;ID<br>
                                 Formato .json: array di oggetti con question, answers e correct_index<br>
                                 La prima risposta è quella corretta (nei .txt).
                             </small>
+                        </div>
+                        <div class="form-group" id="deckNameGroup">
+                            <label for="deckName">Nome deck</label>
+                            <input type="text" id="deckName" placeholder="es. Chapter 2" required>
                         </div>
                         <div class="modal-actions">
                             <button type="button" class="btn btn-secondary" id="cancelImport">Annulla</button>
@@ -254,9 +258,10 @@
                     <div id="importTab" class="tab-content">
                         <form id="importQuestionsForm">
                             <div class="form-group">
-                                <label for="questionsFile">File Domande (.txt, .csv o .json) *</label>
-                                <input type="file" id="questionsFile" accept=".txt,.csv,.json" required>
-                                <small class="form-help">
+                                <label for="questionsFile">File domande (.txt, .csv o .json) *</label>
+                                <input type="file" id="questionsFile" accept=".txt,.csv,.json" aria-describedby="questionsFileHelp" multiple required>
+                                <small class="form-help" id="questionsFileHelp">
+                                    Puoi aggiungere le domande di più file al deck selezionato.<br>
                                     Formato .txt: Domanda;Risposta1;Risposta2;Risposta3;Risposta4;;ID<br>
                                     Formato .csv: domanda,risposta1,risposta2,risposta3,risposta4,correctIndex<br>
                                     Formato .json: array di oggetti con question, answers e correct_index
@@ -329,6 +334,60 @@ git push</pre>
                     </div>
                 </div>
             </div>
+        </dialog>
+        <dialog id="startExamDialog" class="modal" aria-labelledby="startExamTitle">
+            <form>
+                <div class="modal-header">
+                    <h2 id="startExamTitle">Simulazione d’esame</h2>
+                    <button class="modal-close" type="button" data-close-dialog aria-label="Chiudi">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="examQuestionCount">Numero di domande</label>
+                        <input type="number" id="examQuestionCount" min="1" step="1" required aria-describedby="examQuestionLimit" autofocus>
+                        <small class="form-help" id="examQuestionLimit"></small>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" data-close-dialog>Annulla</button>
+                        <button type="submit" class="btn btn-primary">Inizia esame</button>
+                    </div>
+                </div>
+            </form>
+        </dialog>
+        <dialog id="renameStudyDialog" class="modal" aria-labelledby="renameStudyTitle">
+            <form>
+                <div class="modal-header">
+                    <h2 id="renameStudyTitle"></h2>
+                    <button class="modal-close" type="button" data-close-dialog aria-label="Chiudi">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="studyName">Nuovo nome</label>
+                        <input type="text" id="studyName" required autofocus>
+                    </div>
+                    <p class="import-status error" role="alert" hidden></p>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" data-close-dialog>Annulla</button>
+                        <button type="submit" class="btn btn-primary">Salva nome</button>
+                    </div>
+                </div>
+            </form>
+        </dialog>
+        <dialog id="deleteCourseDialog" class="modal" aria-labelledby="deleteCourseTitle" aria-describedby="deleteCourseMessage">
+            <form>
+                <div class="modal-header">
+                    <h2 id="deleteCourseTitle">Elimina corso</h2>
+                    <button class="modal-close" type="button" data-close-dialog aria-label="Chiudi">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="delete-course-message" id="deleteCourseMessage"></p>
+                    <p class="import-status error" role="alert" hidden></p>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" data-close-dialog autofocus>Annulla</button>
+                        <button type="submit" class="btn btn-danger">Elimina corso</button>
+                    </div>
+                </div>
+            </form>
         </dialog>
         <dialog id="deckColorDialog" class="modal deck-color-dialog" aria-labelledby="deckColorTitle">
             <form method="dialog">

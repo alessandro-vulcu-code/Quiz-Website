@@ -17,8 +17,10 @@ const SupabaseService = {
             const { data: coursesData, error } = await supabaseClient
                 .from('courses')
                 .select(`
+                    id,
                     name,
                     decks (
+                        id,
                         name,
                         is_imported,
                         import_date,
@@ -36,13 +38,15 @@ const SupabaseService = {
 
             // Trasforma i dati nel formato atteso dall'app (STUDY_DATA)
             const formattedData = {
-                courses: {}
+                courses: Object.create(null)
             };
 
             coursesData.forEach(course => {
                 formattedData.courses[course.name] = {
+                    databaseId: course.id,
                     decks: course.decks.map(deck => {
                         return {
+                            databaseId: deck.id,
                             name: deck.name,
                             imported: deck.is_imported,
                             importDate: deck.import_date,
@@ -74,6 +78,20 @@ const SupabaseService = {
             return { courses: {} }; // Ritorna oggetto vuoto in caso di errore
         }
     },
+
+    async changeStudyItem(operation, id, currentName, newName) {
+        const parameters = { target_id: id, expected_name: currentName };
+        if (newName !== undefined) parameters.new_name = newName;
+
+        const { data: changed, error } = await supabaseClient.rpc(operation, parameters);
+        if (error?.code === 'PGRST202') {
+            throw new Error('Aggiorna Supabase con allow_study_management.sql per usare questa funzione.');
+        }
+        if (error?.code === '23505') throw new Error('Questo nome è già in uso.');
+        if (error) throw error;
+        if (!changed) throw new Error('L’elemento è cambiato. Ricarica la pagina e riprova.');
+    },
+
     /**
      * Salva un nuovo deck nel database
      */
@@ -117,7 +135,16 @@ const SupabaseService = {
             const deckId = deckData.id;
 
             // 3. Inserisci le domande
-            await this.insertQuestions(deckId, questions);
+            try {
+                await this.insertQuestions(deckId, questions);
+            } catch (error) {
+                const { error: deleteError } = await supabaseClient.from('decks').delete().eq('id', deckId);
+                if (deleteError) {
+                    console.error('Errore durante la rimozione del deck incompleto:', deleteError);
+                    throw new Error(`${error.message} Verifica il deck «${deckName}» prima di riprovare.`);
+                }
+                throw error;
+            }
 
             return true;
 
@@ -216,33 +243,36 @@ const SupabaseService = {
      * Helper per inserire domande e risposte
      */
     async insertQuestions(deckId, questions) {
-        for (const q of questions) {
-            // Inserisci domanda
-            const { data: questionData, error: qError } = await supabaseClient
-                .from('questions')
-                .insert([{
-                    deck_id: deckId,
-                    question_text: q.question
-                }])
-                .select()
-                .single();
+        const questionRows = questions.map(question => ({
+            id: crypto.randomUUID(),
+            deck_id: deckId,
+            question_text: question.question
+        }));
+        const answerRows = questions.flatMap((question, questionIndex) =>
+            question.answers.map((answer, answerIndex) => ({
+                question_id: questionRows[questionIndex].id,
+                answer_text: answer,
+                is_correct: answerIndex === question.correctIndex
+            }))
+        );
 
-            if (qError) throw qError;
-            const questionId = questionData.id;
+        const { error: questionError } = await supabaseClient.from('questions').insert(questionRows);
+        if (questionError) throw questionError;
 
-            // Inserisci risposte
-            const answersToInsert = q.answers.map((ansText, index) => ({
-                question_id: questionId,
-                answer_text: ansText,
-                is_correct: index === q.correctIndex
-            }));
+        const { error: answerError } = await supabaseClient.from('answers').insert(answerRows);
+        if (!answerError) return;
 
-            const { error: ansError } = await supabaseClient
-                .from('answers')
-                .insert(answersToInsert);
-
-            if (ansError) throw ansError;
+        // Limita la lunghezza dell'URL contenente gli ID da eliminare.
+        const deleteBatchSize = 100;
+        for (let start = 0; start < questionRows.length; start += deleteBatchSize) {
+            const ids = questionRows.slice(start, start + deleteBatchSize).map(row => row.id);
+            const { error: deleteError } = await supabaseClient.from('questions').delete().in('id', ids);
+            if (deleteError) {
+                console.error('Errore durante la rimozione delle domande incomplete:', deleteError);
+                throw new Error(`${answerError.message} Verifica le domande del deck prima di riprovare.`);
+            }
         }
+        throw answerError;
     },
 
     /**
@@ -272,7 +302,7 @@ const SupabaseService = {
             if (settingsError) throw settingsError;
 
             // Trasforma in oggetto { deckName: percentage }
-            const result = {};
+            const result = Object.create(null);
             if (settings) {
                 settings.forEach(s => {
                     if (s.decks) {
