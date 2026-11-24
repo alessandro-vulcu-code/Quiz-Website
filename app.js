@@ -2,11 +2,15 @@
 let currentCourse = null;
 let currentDeck = null;
 let currentQuestionIndex = 0;
-let score = 0;
 let userAnswers = []; // Array to store user's answer for each question {questionIndex, selectedIndex, isCorrect}
 let shuffledQuestions = [];
 let appData = null; // Will hold all quiz data (hard-coded + imported)
 let quizCompleted = false; // Track if quiz is finished
+
+// History entries refer to quiz attempts kept in this tab.
+let activeRoute = { view: 'home' };
+const quizAttempts = new Map();
+let deckColorTarget = null;
 
 // Stopwatch state
 let stopwatchInterval = null;
@@ -31,6 +35,8 @@ const elements = {
     quizDeckName: document.getElementById('quizDeckName'),
     scoreDisplay: document.getElementById('scoreDisplay'),
     questionText: document.getElementById('questionText'),
+    quizNavJump: document.getElementById('quizNavJump'),
+    quizNavSidebar: document.getElementById('quizNavSidebar'),
     answersContainer: document.getElementById('answersContainer'),
     feedback: document.getElementById('feedback'),
     feedbackIcon: document.getElementById('feedbackIcon'),
@@ -45,15 +51,84 @@ const elements = {
 };
 
 // ===== Navigation Functions =====
+function sameRoute(first, second) {
+    return first?.view === second.view && first.course === second.course && first.attempt === second.attempt;
+}
+
+function navigateTo(route, { back = false } = {}) {
+    if (sameRoute(activeRoute, route)) return;
+
+    if (back && sameRoute(history.state?.studyHub?.previous, route)) {
+        history.back();
+        return;
+    }
+
+    history.pushState({ studyHub: { route, previous: activeRoute } }, '');
+    restoreRoute(route);
+}
+
+function restoreRoute(route) {
+    if (activeRoute.attempt) {
+        stopStopwatch();
+        Object.assign(quizAttempts.get(activeRoute.attempt), {
+            questionIndex: currentQuestionIndex,
+            answers: userAnswers,
+            elapsed: stopwatchElapsed,
+            completed: quizCompleted
+        });
+    }
+
+    if (route.course && !Object.hasOwn(appData.courses, route.course)) {
+        route = { view: 'home' };
+    } else if (route.attempt && !quizAttempts.has(route.attempt)) {
+        route = { view: 'deck', course: route.course };
+    }
+
+    activeRoute = route;
+    currentCourse = route.course ?? null;
+    document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
+    elements.progressContainer.style.display = route.view === 'quiz' ? 'flex' : 'none';
+
+    if (route.view === 'home') {
+        renderCourses();
+    } else if (route.view === 'deck') {
+        elements.courseTitle.textContent = currentCourse;
+        renderDecks();
+    } else {
+        const attempt = quizAttempts.get(route.attempt);
+        currentDeck = attempt.deck;
+        shuffledQuestions = attempt.questions;
+        currentQuestionIndex = attempt.questionIndex;
+        userAnswers = attempt.answers;
+        quizCompleted = attempt.completed;
+        stopwatchElapsed = attempt.elapsed;
+        elements.quizDeckName.textContent = currentDeck.name;
+    }
+
+    showView(route.view);
+    if (route.view === 'quiz') {
+        renderQuizNavGrid();
+        loadQuestion();
+        document.getElementById('stopwatchDisplay').textContent = formatTime(stopwatchElapsed);
+        if (!quizCompleted) resumeStopwatch();
+    } else if (route.view === 'results') {
+        showResults();
+    }
+}
+
 function showView(viewName) {
     Object.values(views).forEach(view => view.classList.remove('active'));
-    views[viewName].classList.add('active');
+    const view = views[viewName];
+    view.classList.add('active');
+    view.querySelector('h2').focus({ preventScroll: true });
+    window.scrollTo(0, 0);
 }
 
 // ===== Initialization =====
 async function init() {
     // Initialize theme
     initTheme();
+    setupEventListeners();
 
     // Show loading state (optional, but good practice)
     const courseList = document.getElementById('courseList');
@@ -61,8 +136,14 @@ async function init() {
 
     // Load all data (Supabase + imported)
     appData = await StorageManager.loadAllData();
-    renderCourses();
-    setupEventListeners();
+    const entry = history.state?.studyHub ?? { route: { view: 'home' } };
+    restoreRoute(entry.route);
+    history.replaceState({ studyHub: { ...entry, route: activeRoute } }, '');
+    window.addEventListener('popstate', event => {
+        restoreRoute(event.state?.studyHub?.route ?? { view: 'home' });
+    });
+    document.getElementById('importButton').disabled = false;
+    document.getElementById('generateCodeButton').disabled = false;
 }
 
 // ===== Theme Toggle =====
@@ -73,10 +154,7 @@ function initTheme() {
 
 function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
-    const icon = document.getElementById('themeToggleIcon');
-    if (icon) {
-        icon.textContent = theme === 'dark' ? '☀️' : '🌙';
-    }
+    document.getElementById('themeToggle').setAttribute('aria-pressed', String(theme === 'dark'));
     localStorage.setItem('theme', theme);
 }
 
@@ -89,29 +167,19 @@ function setupEventListeners() {
     // Theme toggle
     document.getElementById('themeToggle').addEventListener('click', toggleTheme);
 
-    // Back buttons
+    // Back buttons return to the named screen, reusing the previous entry when possible.
     document.getElementById('backToCourses').addEventListener('click', () => {
-        showView('home');
+        navigateTo({ view: 'home' }, { back: true });
     });
-
     document.getElementById('backToDecks').addEventListener('click', () => {
-        stopStopwatch();
-        showView('deck');
-        elements.progressContainer.style.display = 'none';
+        navigateTo({ view: 'deck', course: currentCourse }, { back: true });
     });
-
     document.getElementById('backToDecksFromResults').addEventListener('click', () => {
-        showView('deck');
-        elements.progressContainer.style.display = 'none';
+        navigateTo({ view: 'deck', course: currentCourse });
     });
-
-    const backToHomeBtn = document.getElementById('backToHome');
-    if (backToHomeBtn) {
-        backToHomeBtn.addEventListener('click', () => {
-            showView('home');
-            elements.progressContainer.style.display = 'none';
-        });
-    }
+    document.getElementById('backToHome').addEventListener('click', () => {
+        navigateTo({ view: 'home' });
+    });
 
     // Quiz buttons
     elements.confirmButton.addEventListener('click', handleConfirm);
@@ -119,6 +187,7 @@ function setupEventListeners() {
     elements.nextQuestionButton.addEventListener('click', goToNextQuestion);
     elements.finishButton.addEventListener('click', finishQuiz);
     document.getElementById('navFinishButton').addEventListener('click', finishQuiz);
+    elements.quizNavJump.addEventListener('click', () => elements.quizNavSidebar.focus());
 
     // Results buttons
     document.getElementById('restartQuiz').addEventListener('click', restartQuiz);
@@ -145,7 +214,7 @@ function setupEventListeners() {
     // Tab navigation for add questions modal
     document.querySelectorAll('.tab-button').forEach(button => {
         button.addEventListener('click', (e) => {
-            const tabName = e.target.dataset.tab;
+            const tabName = e.currentTarget.dataset.tab;
             switchTab(tabName);
         });
     });
@@ -155,124 +224,162 @@ function setupEventListeners() {
     document.getElementById('closeExamSettingsModal').addEventListener('click', closeExamSettingsModal);
     document.getElementById('cancelExamSettings').addEventListener('click', closeExamSettingsModal);
     document.getElementById('saveExamSettings').addEventListener('click', saveExamSettings);
+    document.querySelector('#deckColorDialog form').addEventListener('submit', saveDeckColor);
 }
 
 // ===== Course & Deck Rendering =====
 function renderCourses() {
     elements.courseList.innerHTML = '';
 
-    Object.keys(appData.courses).forEach(courseName => {
+    const courseNames = Object.keys(appData.courses);
+    if (courseNames.length === 0) {
+        elements.courseList.innerHTML = '<p class="loading">Nessun corso disponibile. Importa un quiz per iniziare.</p>';
+    }
+
+    courseNames.forEach(courseName => {
         const course = appData.courses[courseName];
         const deckCount = course.decks.length;
         const totalQuestions = course.decks.reduce((sum, deck) => sum + deck.questions.length, 0);
 
-        const courseCard = document.createElement('div');
-        courseCard.className = 'card';
-        courseCard.innerHTML = `
-            <div class="card-icon">📖</div>
-            <div class="card-title">${courseName}</div>
-            <div class="card-description">${deckCount} deck • ${totalQuestions} domande</div>
-        `;
-
-        courseCard.addEventListener('click', () => selectCourse(courseName));
+        const courseCard = createStudyRow(
+            courseName,
+            `${deckCount} deck · ${questionCount(totalQuestions)}`,
+            () => selectCourse(courseName)
+        );
         elements.courseList.appendChild(courseCard);
     });
 }
 
 function selectCourse(courseName) {
-    currentCourse = courseName;
-    elements.courseTitle.textContent = courseName;
-    renderDecks();
-    showView('deck');
+    navigateTo({ view: 'deck', course: courseName });
+}
+
+function questionCount(count) {
+    return count === 1 ? '1 domanda' : `${count} domande`;
+}
+
+function createStudyRow(title, description, onClick) {
+    const button = document.createElement('button');
+    button.className = 'study-row';
+    button.type = 'button';
+    button.innerHTML = `
+        <span class="card-title"></span>
+        <span class="card-description"></span>
+        <span class="row-arrow" aria-hidden="true">→</span>
+    `;
+    button.querySelector('.card-title').textContent = title;
+    button.querySelector('.card-description').textContent = description;
+    button.addEventListener('click', onClick);
+    return button;
+}
+
+function deckColorKey(courseName, deckName) {
+    return `studyHub:deckColor:${JSON.stringify([courseName, deckName])}`;
+}
+
+function createDeckColorButton(courseName, deckName) {
+    const key = deckColorKey(courseName, deckName);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'deck-color-button';
+    button.dataset.color = localStorage.getItem(key) ?? 'none';
+    button.setAttribute('aria-label', `Colore del deck ${deckName}`);
+    button.setAttribute('aria-haspopup', 'dialog');
+    button.title = 'Scegli un colore';
+    button.addEventListener('click', () => {
+        const dialog = document.getElementById('deckColorDialog');
+        deckColorTarget = { key, button };
+        document.getElementById('deckColorName').textContent = deckName;
+        dialog.querySelectorAll('.deck-color-option').forEach(option => {
+            option.setAttribute('aria-pressed', String(option.value === button.dataset.color));
+        });
+        dialog.showModal();
+    });
+    return button;
+}
+
+function saveDeckColor(event) {
+    const color = event.submitter?.value;
+    if (!color) return;
+
+    const { key, button } = deckColorTarget;
+    if (color === 'none') {
+        localStorage.removeItem(key);
+    } else {
+        localStorage.setItem(key, color);
+    }
+    button.dataset.color = color;
 }
 
 function renderDecks() {
-    elements.deckList.innerHTML = '';
+    elements.deckList.replaceChildren();
+    const examSlot = document.getElementById('examSlot');
+    examSlot.replaceChildren();
     const course = appData.courses[currentCourse];
 
-    // Add "Exam" deck if there are questions available
     const totalQuestions = course.decks.reduce((sum, deck) => sum + deck.questions.length, 0);
     const examSettingsButton = document.getElementById('examSettingsButton');
-    if (totalQuestions >= 50) {
-        // Show the exam settings button in the header
-        examSettingsButton.style.display = 'inline-block';
+    examSettingsButton.style.display = totalQuestions >= 50 ? 'inline-flex' : 'none';
 
-        const examCard = document.createElement('div');
-        examCard.className = 'card exam-deck';
-        examCard.innerHTML = `
-            <div class="card-icon">📝</div>
-            <div class="card-title">Exam Mode</div>
-            <div class="card-description">50 domande casuali da tutti i deck</div>
-        `;
-        examCard.addEventListener('click', () => startExamMode());
-        elements.deckList.appendChild(examCard);
-    } else {
-        // Hide the exam settings button if exam mode is not available
-        examSettingsButton.style.display = 'none';
+    if (totalQuestions >= 50) {
+        const examButton = createStudyRow('Simulazione d’esame', '50 domande casuali', startExamMode);
+        examButton.classList.add('exam-deck');
+        examSlot.appendChild(examButton);
     }
 
-    // Render regular decks
+    if (course.decks.length === 0) {
+        elements.deckList.innerHTML = '<p class="loading">Nessun deck disponibile.</p>';
+    }
+
     course.decks.forEach((deck, index) => {
-        const deckCard = document.createElement('div');
-        deckCard.className = deck.imported ? 'card imported' : 'card';
+        const row = document.createElement('div');
+        row.className = 'deck-row';
+        row.appendChild(createDeckColorButton(currentCourse, deck.name));
 
-        // Add delete button for imported decks
-        let deleteButton = '';
+        const deckButton = createStudyRow(deck.name, questionCount(deck.questions.length), () => startQuiz(index));
+        deckButton.disabled = deck.questions.length === 0;
+        row.appendChild(deckButton);
+
         if (deck.imported) {
-            deleteButton = `<button class="delete-btn" data-deck-index="${index}" title="Elimina deck">×</button>`;
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'delete-btn';
+            deleteButton.type = 'button';
+            deleteButton.textContent = 'Elimina';
+            deleteButton.setAttribute('aria-label', `Elimina deck ${deck.name}`);
+            deleteButton.addEventListener('click', () => deleteDeck(currentCourse, deck.name));
+            row.appendChild(deleteButton);
         }
 
-        deckCard.innerHTML = `
-            ${deleteButton}
-            <div class="card-icon">🎯</div>
-            <div class="card-title">${deck.name}</div>
-            <div class="card-description">${deck.questions.length} domande</div>
-        `;
-
-        // Click on card to start quiz (but not on delete button)
-        deckCard.addEventListener('click', (e) => {
-            if (!e.target.classList.contains('delete-btn')) {
-                startQuiz(index);
-            }
-        });
-
-        // Delete button handler
-        if (deck.imported) {
-            const deleteBtn = deckCard.querySelector('.delete-btn');
-            deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteDeck(currentCourse, deck.name);
-            });
-        }
-
-        elements.deckList.appendChild(deckCard);
+        elements.deckList.appendChild(row);
     });
 }
 
 // ===== Quiz Logic =====
 function startQuiz(deckIndex) {
-    currentDeck = appData.courses[currentCourse].decks[deckIndex];
-    currentQuestionIndex = 0;
-    score = 0;
-    quizCompleted = false;
+    const deck = appData.courses[currentCourse].decks[deckIndex];
+    startQuizAttempt(deck);
+}
 
-    // Create a copy of questions and shuffle them
-    shuffledQuestions = currentDeck.questions.map(q => ({ ...q }));
+function startQuizAttempt(deck) {
+    const questions = deck.questions.map(question => ({ ...question }));
+    if (questions.length === 0) return;
 
-    // Initialize answers array (null = not answered yet)
-    userAnswers = new Array(shuffledQuestions.length).fill(null);
-
-    elements.quizDeckName.textContent = currentDeck.name;
-    elements.progressContainer.style.display = 'flex';
-
-    showView('quiz');
-    renderQuizNavGrid();
-    startStopwatch();
-    loadQuestion();
+    // Keep IDs distinct from history entries left over after a page reload.
+    const attempt = crypto.getRandomValues(new Uint32Array(2)).join('-');
+    quizAttempts.set(attempt, {
+        deck,
+        questions,
+        questionIndex: 0,
+        answers: Array(questions.length).fill(null),
+        elapsed: 0,
+        completed: false
+    });
+    navigateTo({ view: 'quiz', course: currentCourse, attempt });
 }
 
 // ===== Exam Mode =====
 async function startExamMode() {
+    const origin = activeRoute;
     const course = appData.courses[currentCourse];
     const totalQuestionsTarget = 50;
 
@@ -283,6 +390,8 @@ async function startExamMode() {
     } catch (e) {
         console.warn('Could not load exam settings, using equal distribution:', e);
     }
+
+    if (activeRoute !== origin) return;
 
     // Check if we have valid saved settings (sum = 100)
     const savedSum = Object.values(savedSettings).reduce((s, v) => s + v, 0);
@@ -329,32 +438,17 @@ async function startExamMode() {
         [examQuestions[i], examQuestions[j]] = [examQuestions[j], examQuestions[i]];
     }
 
-    // Set up exam
-    currentDeck = {
-        name: 'Exam Mode',
-        questions: examQuestions
-    };
-    currentQuestionIndex = 0;
-    quizCompleted = false;
-    shuffledQuestions = examQuestions;
-    userAnswers = new Array(examQuestions.length).fill(null);
-
-    elements.quizDeckName.textContent = `Exam Mode (${examQuestions.length} domande)`;
-    elements.progressContainer.style.display = 'flex';
-
-    showView('quiz');
-    renderQuizNavGrid();
-    startStopwatch();
-    loadQuestion();
+    startQuizAttempt({ name: 'Simulazione d’esame', questions: examQuestions });
 }
 
 // ===== Exam Settings Modal Functions =====
 async function openExamSettingsModal() {
+    const origin = activeRoute;
     const modal = document.getElementById('examSettingsModal');
-    modal.classList.add('active');
+    modal.showModal();
 
     const container = document.getElementById('examSettingsContainer');
-    container.innerHTML = '<div style="text-align:center; color: var(--text-muted);">Caricamento...</div>';
+    container.innerHTML = '<p class="loading">Caricamento…</p>';
     document.getElementById('examSettingsStatus').style.display = 'none';
 
     const course = appData.courses[currentCourse];
@@ -367,6 +461,8 @@ async function openExamSettingsModal() {
         console.warn('Could not load exam settings:', e);
     }
 
+    if (activeRoute !== origin || !modal.open) return;
+
     // Build the UI for each deck
     container.innerHTML = '';
     course.decks.forEach(deck => {
@@ -375,18 +471,18 @@ async function openExamSettingsModal() {
         const item = document.createElement('div');
         item.className = 'exam-settings-item';
         item.innerHTML = `
-            <span class="deck-name">🎯 ${deck.name}</span>
-            <span class="deck-questions">(${deck.questions.length} dom.)</span>
+            <span class="deck-name"></span>
+            <span class="deck-questions">${questionCount(deck.questions.length)}</span>
             <div class="percentage-input-wrapper">
-                <input type="number" 
-                       class="exam-pct-input" 
-                       data-deck="${deck.name}" 
-                       min="0" max="100" step="1" 
-                       value="${savedPct}" 
-                       placeholder="0">
-                <span class="percentage-symbol">%</span>
+                <input type="number" class="exam-pct-input" min="0" max="100" step="1">
+                <span class="percentage-symbol" aria-hidden="true">%</span>
             </div>
         `;
+        item.querySelector('.deck-name').textContent = deck.name;
+        const input = item.querySelector('input');
+        input.setAttribute('aria-label', `Percentuale per ${deck.name}`);
+        input.dataset.deck = deck.name;
+        input.value = savedPct;
         container.appendChild(item);
     });
 
@@ -400,7 +496,7 @@ async function openExamSettingsModal() {
 
 function closeExamSettingsModal() {
     const modal = document.getElementById('examSettingsModal');
-    modal.classList.remove('active');
+    modal.close();
 }
 
 function updateExamTotal() {
@@ -441,7 +537,7 @@ async function saveExamSettings() {
     // Validate total = 100
     if (total !== 100) {
         const statusDiv = document.getElementById('examSettingsStatus');
-        statusDiv.textContent = `❌ La somma deve essere 100% (attualmente ${total}%)`;
+        statusDiv.textContent = `La somma deve essere 100% (attualmente ${total}%)`;
         statusDiv.className = 'import-status error';
         statusDiv.style.display = 'block';
         return;
@@ -451,7 +547,7 @@ async function saveExamSettings() {
         await SupabaseService.saveExamSettings(currentCourse, settingsMap);
 
         const statusDiv = document.getElementById('examSettingsStatus');
-        statusDiv.textContent = '✅ Impostazioni salvate con successo!';
+        statusDiv.textContent = 'Impostazioni salvate con successo!';
         statusDiv.className = 'import-status success';
         statusDiv.style.display = 'block';
 
@@ -462,19 +558,16 @@ async function saveExamSettings() {
     } catch (error) {
         console.error('Error saving exam settings:', error);
         const statusDiv = document.getElementById('examSettingsStatus');
-        statusDiv.textContent = `❌ Errore: ${error.message}`;
+        statusDiv.textContent = `Errore: ${error.message}`;
         statusDiv.className = 'import-status error';
         statusDiv.style.display = 'block';
     }
 }
 
 // ===== Stopwatch Functions =====
-function startStopwatch() {
-    stopStopwatch(); // Clear any existing
-    stopwatchStartTime = Date.now();
-    stopwatchElapsed = 0;
+function resumeStopwatch() {
+    stopwatchStartTime = Date.now() - stopwatchElapsed;
     const display = document.getElementById('stopwatchDisplay');
-    display.textContent = '0:00:00';
 
     stopwatchInterval = setInterval(() => {
         stopwatchElapsed = Date.now() - stopwatchStartTime;
@@ -483,13 +576,11 @@ function startStopwatch() {
 }
 
 function stopStopwatch() {
-    if (stopwatchInterval) {
-        clearInterval(stopwatchInterval);
-        stopwatchInterval = null;
-    }
-    if (stopwatchStartTime) {
-        stopwatchElapsed = Date.now() - stopwatchStartTime;
-    }
+    if (stopwatchStartTime === null) return;
+    clearInterval(stopwatchInterval);
+    stopwatchInterval = null;
+    stopwatchElapsed = Date.now() - stopwatchStartTime;
+    stopwatchStartTime = null;
 }
 
 function formatTime(ms) {
@@ -526,9 +617,16 @@ function updateQuizNavGrid() {
         if (answer !== null) {
             btn.classList.add(answer.isCorrect ? 'correct' : 'incorrect');
         }
-        if (index === currentQuestionIndex) {
-            btn.classList.add('current');
+        const isCurrent = index === currentQuestionIndex;
+        btn.classList.toggle('current', isCurrent);
+        if (isCurrent) {
+            btn.setAttribute('aria-current', 'step');
+        } else {
+            btn.removeAttribute('aria-current');
         }
+
+        const status = answer === null ? 'Da fare' : answer.isCorrect ? 'Corretta' : 'Sbagliata';
+        btn.setAttribute('aria-label', `Domanda ${index + 1}, ${status}`);
     });
 }
 
@@ -536,20 +634,15 @@ function goToQuestion(index) {
     if (index >= 0 && index < shuffledQuestions.length) {
         currentQuestionIndex = index;
         loadQuestion();
+        if (elements.quizNavJump.offsetWidth > 0) {
+            elements.questionText.focus({ preventScroll: true });
+            elements.questionText.scrollIntoView({ block: 'start' });
+        }
     }
 }
 
 function restartQuiz() {
-    currentQuestionIndex = 0;
-    score = 0;
-    quizCompleted = false;
-    shuffledQuestions = currentDeck.questions.map(q => ({ ...q }));
-    userAnswers = new Array(shuffledQuestions.length).fill(null);
-    showView('quiz');
-    elements.progressContainer.style.display = 'flex';
-    renderQuizNavGrid();
-    startStopwatch();
-    loadQuestion();
+    startQuizAttempt(currentDeck);
 }
 
 // Convert markdown-style bold (**text**) to HTML
@@ -557,6 +650,12 @@ function convertMarkdownToHtml(text) {
     if (!text) return text;
     // Convert **bold** to <strong>bold</strong>
     return text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
+function updateScoreDisplay() {
+    const answeredCount = userAnswers.filter(a => a !== null).length;
+    const correctCount = userAnswers.filter(a => a && a.isCorrect).length;
+    elements.scoreDisplay.textContent = `Punteggio: ${correctCount}/${answeredCount}`;
 }
 
 function loadQuestion() {
@@ -568,10 +667,7 @@ function loadQuestion() {
     const progressPercent = ((currentQuestionIndex + 1) / totalQuestions) * 100;
     elements.progressFill.style.width = `${progressPercent}%`;
 
-    // Update score display
-    const answeredCount = userAnswers.filter(a => a !== null).length;
-    const correctCount = userAnswers.filter(a => a && a.isCorrect).length;
-    elements.scoreDisplay.textContent = `Punteggio: ${correctCount}/${answeredCount}`;
+    updateScoreDisplay();
 
     // Display question with markdown conversion
     elements.questionText.innerHTML = convertMarkdownToHtml(question.question);
@@ -585,16 +681,22 @@ function loadQuestion() {
     // Render answers
     elements.answersContainer.innerHTML = '';
     shuffledAnswers.forEach((answer, index) => {
-        const answerDiv = document.createElement('div');
+        const answerDiv = document.createElement('button');
+        answerDiv.type = 'button';
         answerDiv.className = 'answer-option';
-        answerDiv.innerHTML = convertMarkdownToHtml(answer.text);  // Convert markdown here too
+        answerDiv.innerHTML = `
+            <span class="answer-letter" aria-hidden="true">${String.fromCharCode(65 + index)}</span>
+            <span class="answer-content">${convertMarkdownToHtml(answer.text)}</span>
+        `;
         answerDiv.dataset.index = index;
         answerDiv.dataset.isCorrect = answer.isCorrect;
 
         // Check if this question was already answered
         const savedAnswer = userAnswers[currentQuestionIndex];
+        answerDiv.setAttribute('aria-pressed', String(savedAnswer?.selectedIndex === index));
         if (savedAnswer) {
-            // Disable all answers if already confirmed
+            // Disable all answers
+            answerDiv.setAttribute('aria-disabled', 'true');
             answerDiv.classList.add('disabled');
 
             // Show which was selected and which is correct
@@ -624,6 +726,7 @@ function loadQuestion() {
     } else {
         elements.feedback.style.display = 'none';
         elements.confirmButton.style.display = 'inline-block';
+        elements.confirmButton.disabled = true;
     }
 
     // Update navigation buttons
@@ -660,10 +763,12 @@ function selectAnswer(index) {
 
     // Remove previous selection
     const allAnswers = elements.answersContainer.querySelectorAll('.answer-option');
-    allAnswers.forEach(answer => answer.classList.remove('selected'));
-
-    // Select new answer
-    allAnswers[index].classList.add('selected');
+    allAnswers.forEach((answer, answerIndex) => {
+        const selected = answerIndex === index;
+        answer.classList.toggle('selected', selected);
+        answer.setAttribute('aria-pressed', String(selected));
+    });
+    elements.confirmButton.disabled = false;
 }
 
 function handleConfirm() {
@@ -682,6 +787,8 @@ function handleConfirm() {
         isCorrect: isCorrect
     };
 
+    updateScoreDisplay();
+
     // Show feedback
     showFeedback(isCorrect);
 
@@ -689,6 +796,7 @@ function handleConfirm() {
     const allAnswers = elements.answersContainer.querySelectorAll('.answer-option');
     allAnswers.forEach(answer => {
         answer.classList.add('disabled');
+        answer.setAttribute('aria-disabled', 'true');
         const answerIndex = parseInt(answer.dataset.index);
         if (answer.dataset.isCorrect === 'true') {
             answer.classList.add('correct');
@@ -705,6 +813,9 @@ function handleConfirm() {
 
     // Update quiz navigation grid
     updateQuizNavGrid();
+    const nextAction = [elements.nextQuestionButton, elements.finishButton, elements.prevButton]
+        .find(button => button.style.display !== 'none');
+    nextAction?.focus();
 }
 
 function showFeedback(isCorrect) {
@@ -713,7 +824,7 @@ function showFeedback(isCorrect) {
 
     if (isCorrect) {
         elements.feedbackIcon.textContent = '✓';
-        elements.feedbackText.textContent = 'Risposta corretta! Ottimo lavoro!';
+        elements.feedbackText.textContent = 'Risposta corretta.';
     } else {
         elements.feedbackIcon.textContent = '✗';
         elements.feedbackText.textContent = 'Risposta errata. La risposta corretta è evidenziata.';
@@ -745,6 +856,7 @@ function goToPreviousQuestion() {
     if (currentQuestionIndex > 0) {
         currentQuestionIndex--;
         loadQuestion();
+        elements.questionText.focus();
     }
 }
 
@@ -752,25 +864,21 @@ function goToNextQuestion() {
     if (currentQuestionIndex < shuffledQuestions.length - 1) {
         currentQuestionIndex++;
         loadQuestion();
+        elements.questionText.focus();
     }
 }
 
 function finishQuiz() {
+    if (userAnswers.some(answer => answer === null)) {
+        alert('Per favore, rispondi a tutte le domande prima di terminare il quiz!');
+        return;
+    }
+
     quizCompleted = true;
-    stopStopwatch();
-    showResults();
+    navigateTo({ ...activeRoute, view: 'results' });
 }
 
 function showResults() {
-    if (!quizCompleted) {
-        // Check if all questions are answered
-        const allAnswered = userAnswers.every(a => a !== null);
-        if (!allAnswered) {
-            alert('Per favore, rispondi a tutte le domande prima di terminare il quiz!');
-            return;
-        }
-    }
-
     const totalQuestions = shuffledQuestions.length;
     const score = userAnswers.filter(a => a && a.isCorrect).length;
     const percentage = Math.round((score / totalQuestions) * 100);
@@ -778,36 +886,13 @@ function showResults() {
     elements.finalScore.textContent = `${score}/${totalQuestions}`;
     elements.scorePercentage.textContent = `${percentage}%`;
 
-    // Set congratulatory message based on performance
-    let message = '';
-    let icon = '';
-
-    if (percentage === 100) {
-        message = '🌟 Perfetto! Hai risposto correttamente a tutte le domande!';
-        icon = '🎉';
-    } else if (percentage >= 80) {
-        message = '🎊 Ottimo lavoro! Hai una buona padronanza dell\'argomento!';
-        icon = '🎊';
-    } else if (percentage >= 60) {
-        message = '👍 Buon risultato! Continua a studiare per migliorare!';
-        icon = '👍';
-    } else {
-        message = '📚 Continua a studiare! La pratica rende perfetti!';
-        icon = '📚';
-    }
-
-    elements.resultsMessage.textContent = message;
-    document.querySelector('.results-icon').textContent = icon;
+    elements.resultsMessage.textContent = `${currentCourse} · ${currentDeck.name}`;
 
     // Show elapsed time
     const resultsTimeValue = document.getElementById('resultsTimeValue');
     resultsTimeValue.textContent = formatTime(stopwatchElapsed);
 
-    // Generate detailed review
     generateReview();
-
-    elements.progressContainer.style.display = 'none';
-    showView('results');
 }
 
 function generateReview() {
@@ -886,7 +971,7 @@ function generateReview() {
 // ===== Import Modal Functions =====
 function openImportModal() {
     const modal = document.getElementById('importModal');
-    modal.classList.add('active');
+    modal.showModal();
 
     // Reset form
     document.getElementById('importForm').reset();
@@ -899,7 +984,7 @@ function openImportModal() {
 
 function closeImportModal() {
     const modal = document.getElementById('importModal');
-    modal.classList.remove('active');
+    modal.close();
 }
 
 async function handleImportSubmit(event) {
@@ -1027,7 +1112,7 @@ function openAddQuestionsModal() {
     }
 
     const modal = document.getElementById('addQuestionsModal');
-    modal.classList.add('active');
+    modal.showModal();
 
     // Reset forms
     document.getElementById('manualQuestionForm').reset();
@@ -1044,16 +1129,15 @@ function openAddQuestionsModal() {
 
 function closeAddQuestionsModal() {
     const modal = document.getElementById('addQuestionsModal');
-    modal.classList.remove('active');
+    modal.close();
 }
 
 function switchTab(tabName) {
     // Update tab buttons
     document.querySelectorAll('.tab-button').forEach(btn => {
-        btn.classList.remove('active');
-        if (btn.dataset.tab === tabName) {
-            btn.classList.add('active');
-        }
+        const selected = btn.dataset.tab === tabName;
+        btn.classList.toggle('active', selected);
+        btn.setAttribute('aria-pressed', String(selected));
     });
 
     // Update tab content
@@ -1069,11 +1153,13 @@ function switchTab(tabName) {
 }
 
 async function populateTargetDeckSelect() {
+    const origin = activeRoute;
     const deckSelect = document.getElementById('targetDeckSelect');
     deckSelect.innerHTML = '<option value="">-- Seleziona un deck --</option>';
 
     // Get all decks for current course
     const decks = await StorageManager.getAllDecksForCourse(currentCourse);
+    if (activeRoute !== origin) return;
 
     // Only show imported decks (we can only add to imported decks)
     const importedDecks = decks.filter(deck => deck.imported);
@@ -1097,6 +1183,7 @@ async function populateTargetDeckSelect() {
 
 async function handleManualQuestionSubmit(event) {
     event.preventDefault();
+    const origin = activeRoute;
 
     const deckName = document.getElementById('targetDeckSelect').value;
     if (!deckName) {
@@ -1105,7 +1192,7 @@ async function handleManualQuestionSubmit(event) {
     }
 
     // Get form data
-    const questionText = document.getElementById('questionText').value.trim();
+    const questionText = document.getElementById('manualQuestionText').value.trim();
     const answers = [
         document.getElementById('answer0').value.trim(),
         document.getElementById('answer1').value.trim(),
@@ -1134,18 +1221,16 @@ async function handleManualQuestionSubmit(event) {
 
     try {
         // Add to storage
-        await StorageManager.addQuestionsToDeck(currentCourse, deckName, [newQuestion]);
+        await StorageManager.addQuestionsToDeck(origin.course, deckName, [newQuestion]);
 
         // Reload app data
         appData = await StorageManager.loadAllData();
 
-        // Re-render decks if we're in deck view
-        if (currentCourse) {
-            renderDecks();
-        }
+        if (activeRoute.view === 'deck') renderDecks();
+        if (activeRoute !== origin) return;
 
         // Get new total count
-        const updatedDeck = appData.courses[currentCourse].decks.find(d => d.name === deckName);
+        const updatedDeck = appData.courses[origin.course].decks.find(d => d.name === deckName);
         const totalQuestions = updatedDeck ? updatedDeck.questions.length : 'N/A';
 
         // Show success
@@ -1156,7 +1241,7 @@ async function handleManualQuestionSubmit(event) {
 
         // Close modal after delay
         setTimeout(() => {
-            closeAddQuestionsModal();
+            if (activeRoute === origin) closeAddQuestionsModal();
         }, 2000);
 
     } catch (error) {
@@ -1167,6 +1252,7 @@ async function handleManualQuestionSubmit(event) {
 
 async function handleImportQuestionsSubmit(event) {
     event.preventDefault();
+    const origin = activeRoute;
 
     const deckName = document.getElementById('targetDeckSelect').value;
     if (!deckName) {
@@ -1197,18 +1283,16 @@ async function handleImportQuestionsSubmit(event) {
         }
 
         // Add to storage
-        await StorageManager.addQuestionsToDeck(currentCourse, deckName, questions);
+        await StorageManager.addQuestionsToDeck(origin.course, deckName, questions);
 
         // Reload app data
         appData = await StorageManager.loadAllData();
 
-        // Re-render decks if we're in deck view
-        if (currentCourse) {
-            renderDecks();
-        }
+        if (activeRoute.view === 'deck') renderDecks();
+        if (activeRoute !== origin) return;
 
         // Get new total count
-        const updatedDeck = appData.courses[currentCourse].decks.find(d => d.name === deckName);
+        const updatedDeck = appData.courses[origin.course].decks.find(d => d.name === deckName);
         const totalQuestions = updatedDeck ? updatedDeck.questions.length : 'N/A';
 
         // Show success
@@ -1219,7 +1303,7 @@ async function handleImportQuestionsSubmit(event) {
 
         // Close modal after delay
         setTimeout(() => {
-            closeAddQuestionsModal();
+            if (activeRoute === origin) closeAddQuestionsModal();
         }, 2000);
 
     } catch (error) {
@@ -1245,11 +1329,11 @@ async function deleteDeck(courseName, deckName) {
     const success = await StorageManager.deleteDeck(courseName, deckName);
 
     if (success) {
+        localStorage.removeItem(deckColorKey(courseName, deckName));
         // Reload app data
         appData = await StorageManager.loadAllData();
 
-        // Re-render decks
-        renderDecks();
+        if (activeRoute.view === 'deck') renderDecks();
 
         // Show notification
         alert(`Deck "${deckName}" eliminato con successo!`);
@@ -1260,11 +1344,13 @@ async function deleteDeck(courseName, deckName) {
 
 // ===== Code Generator Functions =====
 async function generateDataCode() {
+    const origin = activeRoute;
     console.log('generateDataCode called');
 
     try {
         // Get all data (hard-coded + imported)
         const allData = await StorageManager.loadAllData();
+        if (activeRoute !== origin) return;
         console.log('Data loaded:', allData);
 
         // Generate JavaScript code
@@ -1293,7 +1379,7 @@ const STUDY_DATA = ${JSON.stringify(allData, null, 4)};
         }
 
         codeTextarea.value = code;
-        codeModal.classList.add('active');
+        codeModal.showModal();
         console.log('Modal should be visible now');
 
     } catch (error) {
@@ -1303,7 +1389,7 @@ const STUDY_DATA = ${JSON.stringify(allData, null, 4)};
 }
 
 function closeCodeModal() {
-    document.getElementById('codeModal').classList.remove('active');
+    document.getElementById('codeModal').close();
 }
 
 function copyGeneratedCode() {
@@ -1317,12 +1403,10 @@ function copyGeneratedCode() {
         // Change button text temporarily
         const copyBtn = document.getElementById('copyCodeButton');
         const originalText = copyBtn.textContent;
-        copyBtn.textContent = '✅ Copiato!';
-        copyBtn.style.background = 'var(--success)';
+        copyBtn.textContent = 'Copiato!';
 
         setTimeout(() => {
             copyBtn.textContent = originalText;
-            copyBtn.style.background = '';
         }, 2000);
     } catch (err) {
         alert('Impossibile copiare automaticamente. Seleziona tutto il testo e copia manualmente (Ctrl+C / Cmd+C)');

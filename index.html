@@ -1,147 +1,149 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="App per lo studio con domande a scelta multipla">
-    <title>Multiple Choice Study App</title>
+    <title>Study Hub</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
+    <a class="skip-link" href="#studyContent">Vai ai contenuti</a>
     <div class="container">
         <!-- Header -->
         <header class="header">
-            <h1 class="logo">📚 Study Hub</h1>
+            <h1 class="logo"><span class="brand-mark" aria-hidden="true"></span>Study Hub</h1>
             <div class="progress-container" id="progressContainer" style="display: none;">
                 <div class="progress-text" id="progressText">Domanda 1 di 10</div>
                 <div class="progress-bar">
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
             </div>
-            <button class="theme-toggle" id="themeToggle" title="Cambia tema">
-                <span class="theme-toggle-icon" id="themeToggleIcon">☀️</span>
+            <button class="theme-toggle" id="themeToggle" type="button" aria-label="Tema scuro" aria-pressed="true">
+                <span class="theme-toggle-icon" aria-hidden="true"></span>Tema scuro
             </button>
         </header>
 
-        <!-- Home View: Course Selection -->
-        <div id="homeView" class="view active">
-            <div class="view-header">
-                <h2>Scegli un Corso</h2>
-                <p>Seleziona il corso per iniziare a studiare</p>
-                <div class="button-group">
-                    <button class="btn btn-import" id="importButton">📥 Importa Quiz</button>
-                    <button class="btn btn-secondary" id="generateCodeButton" title="Genera codice per data.js">🔧
-                        Genera Codice per GitHub</button>
+        <main id="studyContent" tabindex="-1">
+            <!-- Home View: Course Selection -->
+            <div id="homeView" class="view active">
+                <div class="view-header">
+                    <h2 tabindex="-1">Corsi</h2>
+                    <div class="button-group">
+                        <button class="btn btn-import" id="importButton" disabled>Importa quiz</button>
+                        <button class="btn btn-secondary" id="generateCodeButton" disabled title="Genera codice per data.js">Esporta data.js</button>
+                    </div>
                 </div>
+                <div class="index-heading"><span>Corso</span><span>Materiale</span></div>
+                <div id="courseList" class="card-grid"></div>
             </div>
-            <div id="courseList" class="card-grid"></div>
-        </div>
 
-        <!-- Deck Selection View -->
-        <div id="deckView" class="view">
-            <div class="view-header">
-                <button class="back-button" id="backToCourses">← Torna ai Corsi</button>
-                <h2 id="courseTitle">Digital Communications</h2>
-                <p>Scegli un deck di domande</p>
-                <div class="button-group">
-                    <button class="btn btn-primary" id="addQuestionsButton">➕ Aggiungi Domande</button>
-                    <button class="btn btn-secondary" id="examSettingsButton" style="display: none;">⚙️ Exam
-                        Settings</button>
+            <!-- Deck Selection View -->
+            <div id="deckView" class="view">
+                <div class="view-header">
+                    <button class="back-button" id="backToCourses">← Tutti i corsi</button>
+                    <h2 id="courseTitle" tabindex="-1"></h2>
+                    <div class="button-group">
+                        <button class="btn btn-primary" id="addQuestionsButton">Aggiungi domande</button>
+                        <button class="btn btn-secondary" id="examSettingsButton" style="display: none;">Impostazioni esame</button>
+                    </div>
                 </div>
+                <div id="examSlot"></div>
+                <div class="index-heading"><span>Deck</span><span>Domande</span></div>
+                <div id="deckList" class="card-grid"></div>
             </div>
-            <div id="deckList" class="card-grid"></div>
-        </div>
 
-        <!-- Quiz View -->
-        <div id="quizView" class="view">
-            <div class="quiz-layout">
-                <!-- Main Quiz Content -->
-                <div class="quiz-main">
-                    <div class="quiz-container">
-                        <div class="quiz-header">
-                            <button class="back-button" id="backToDecks">← Torna ai Deck</button>
-                            <div class="quiz-info">
-                                <span id="quizDeckName">Appendix Questions</span>
-                                <span class="score" id="scoreDisplay">Punteggio: 0/0</span>
+            <!-- Quiz View -->
+            <div id="quizView" class="view">
+                <div class="quiz-layout">
+                    <!-- Main Quiz Content -->
+                    <div class="quiz-main">
+                        <div class="quiz-container">
+                            <div class="quiz-header">
+                                <button class="back-button" id="backToDecks">← Torna ai deck</button>
+                                <div class="quiz-info">
+                                    <h2 id="quizDeckName" tabindex="-1"></h2>
+                                    <span class="score" id="scoreDisplay">Punteggio: 0/0</span>
+                                    <button class="btn btn-secondary quiz-nav-jump" id="quizNavJump" type="button"
+                                        aria-controls="quizNavSidebar">Tutte le domande</button>
+                                </div>
+                            </div>
+
+                            <div class="question-card" id="questionCard">
+                                <h3 class="question-text" id="questionText" tabindex="-1"></h3>
+                                <div class="answers-container" id="answersContainer"></div>
+
+                                <div class="feedback" id="feedback" role="status" style="display: none;">
+                                    <div class="feedback-icon" id="feedbackIcon" aria-hidden="true"></div>
+                                    <div class="feedback-text" id="feedbackText"></div>
+                                </div>
+
+                                <div class="quiz-actions">
+                                    <button class="btn btn-secondary" id="prevButton">← Precedente</button>
+                                    <button class="btn btn-primary" id="confirmButton">Conferma</button>
+                                    <button class="btn btn-secondary" id="nextQuestionButton">Prossima →</button>
+                                    <button class="btn btn-primary" id="finishButton" style="display: none;">Termina quiz</button>
+                                </div>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="question-card" id="questionCard">
-                            <div class="question-text" id="questionText"></div>
-                            <div class="answers-container" id="answersContainer"></div>
-
-                            <div class="feedback" id="feedback" style="display: none;">
-                                <div class="feedback-icon" id="feedbackIcon"></div>
-                                <div class="feedback-text" id="feedbackText"></div>
-                            </div>
-
-                            <div class="quiz-actions">
-                                <button class="btn btn-secondary" id="prevButton">← Precedente</button>
-                                <button class="btn btn-primary" id="confirmButton">Conferma</button>
-                                <button class="btn btn-secondary" id="nextQuestionButton">Prossima →</button>
-                                <button class="btn btn-primary" id="finishButton" style="display: none;">Termina
-                                    Quiz</button>
-                            </div>
+                    <!-- Quiz Navigation Sidebar -->
+                    <aside class="quiz-nav-sidebar" id="quizNavSidebar" tabindex="-1" aria-labelledby="quizNavTitle">
+                        <h3 class="quiz-nav-header" id="quizNavTitle">Domande</h3>
+                        <div class="quiz-nav-grid" id="quizNavGrid">
+                            <!-- Populated dynamically by JS -->
                         </div>
-                    </div>
-                </div>
-
-                <!-- Quiz Navigation Sidebar -->
-                <aside class="quiz-nav-sidebar" id="quizNavSidebar">
-                    <div class="quiz-nav-header">QUIZ NAVIGATION</div>
-                    <div class="quiz-nav-grid" id="quizNavGrid">
-                        <!-- Populated dynamically by JS -->
-                    </div>
-                    <div class="quiz-nav-legend">
-                        <div class="legend-item"><span class="legend-dot legend-correct"></span> Corretta</div>
-                        <div class="legend-item"><span class="legend-dot legend-incorrect"></span> Sbagliata</div>
-                        <div class="legend-item"><span class="legend-dot legend-current"></span> Attuale</div>
-                        <div class="legend-item"><span class="legend-dot legend-unanswered"></span> Da fare</div>
-                    </div>
-                    <button class="quiz-nav-finish" id="navFinishButton">Termina Quiz...</button>
-                    <div class="quiz-nav-stopwatch">
-                        <span class="stopwatch-label">⏱ Tempo</span>
-                        <span class="stopwatch-time" id="stopwatchDisplay">0:00:00</span>
-                    </div>
-                </aside>
-            </div>
-        </div>
-
-        <!-- Results View -->
-        <div id="resultsView" class="view">
-            <div class="results-container">
-                <div class="results-icon">🎉</div>
-                <h2>Quiz Completato!</h2>
-                <div class="results-score">
-                    <div class="score-big" id="finalScore">0/0</div>
-                    <div class="score-percentage" id="scorePercentage">0%</div>
-                </div>
-                <div class="results-time" id="resultsTime">
-                    <span class="results-time-icon">⏱</span>
-                    <span class="results-time-value" id="resultsTimeValue">0:00:00</span>
-                </div>
-                <p class="results-message" id="resultsMessage"></p>
-                <div class="results-actions">
-                    <button class="btn btn-secondary" id="backToHome">🏠 Home</button>
-                    <button class="btn btn-primary" id="restartQuiz">🔄 Rifai Quiz</button>
-                    <button class="btn btn-secondary" id="backToDecksFromResults">📚 Altri Deck</button>
+                        <div class="quiz-nav-legend">
+                            <div class="legend-item"><span class="legend-dot legend-correct"></span> Corretta</div>
+                            <div class="legend-item"><span class="legend-dot legend-incorrect"></span> Sbagliata</div>
+                            <div class="legend-item"><span class="legend-dot legend-current"></span> Attuale</div>
+                            <div class="legend-item"><span class="legend-dot legend-unanswered"></span> Da fare</div>
+                        </div>
+                        <button class="quiz-nav-finish" id="navFinishButton">Termina quiz</button>
+                        <div class="quiz-nav-stopwatch">
+                            <span class="stopwatch-label">Tempo</span>
+                            <span class="stopwatch-time" id="stopwatchDisplay">0:00:00</span>
+                        </div>
+                    </aside>
                 </div>
             </div>
 
-            <div class="review-section">
-                <h3>📝 Riepilogo Risposte</h3>
-                <div id="reviewContainer" class="review-container"></div>
+            <!-- Results View -->
+            <div id="resultsView" class="view">
+                <div class="results-container">
+                    <h2 tabindex="-1">Risultato</h2>
+                    <p class="results-message" id="resultsMessage"></p>
+                    <div class="results-score" aria-label="Punteggio">
+                        <div class="score-big" id="finalScore">0/0</div>
+                        <div class="score-percentage" id="scorePercentage">0%</div>
+                    </div>
+                    <div class="results-time" id="resultsTime">
+                        <span>Tempo</span>
+                        <span class="results-time-value" id="resultsTimeValue">0:00:00</span>
+                    </div>
+                    <div class="results-actions">
+                        <button class="btn btn-secondary" id="backToHome">Tutti i corsi</button>
+                        <button class="btn btn-primary" id="restartQuiz">Rifai quiz</button>
+                        <button class="btn btn-secondary" id="backToDecksFromResults">Altri deck</button>
+                    </div>
+                </div>
+
+                <div class="review-section">
+                    <h3>Riepilogo risposte</h3>
+                    <div id="reviewContainer" class="review-container"></div>
+                </div>
             </div>
-        </div>
+        </main>
 
         <!-- Import Modal -->
-        <div id="importModal" class="modal">
+        <dialog id="importModal" class="modal" aria-labelledby="importModalTitle">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3>Importa Nuovo Quiz</h3>
-                    <button class="modal-close" id="closeImportModal">&times;</button>
+                    <h2 id="importModalTitle">Importa quiz</h2>
+                    <button class="modal-close" type="button" aria-label="Chiudi" id="closeImportModal">&times;</button>
                 </div>
                 <div class="modal-body">
                     <form id="importForm">
@@ -174,17 +176,17 @@
                             <button type="submit" class="btn btn-primary">Importa</button>
                         </div>
                     </form>
-                    <div id="importStatus" class="import-status" style="display: none;"></div>
+                    <div id="importStatus" class="import-status" role="status" style="display: none;"></div>
                 </div>
             </div>
-        </div>
+        </dialog>
 
         <!-- Add Questions Modal -->
-        <div id="addQuestionsModal" class="modal">
-            <div class="modal-content" style="max-width: 700px;">
+        <dialog id="addQuestionsModal" class="modal" aria-labelledby="addQuestionsModalTitle">
+            <div class="modal-content">
                 <div class="modal-header">
-                    <h3>➕ Aggiungi Domande al Deck</h3>
-                    <button class="modal-close" id="closeAddQuestionsModal">&times;</button>
+                    <h2 id="addQuestionsModalTitle">Aggiungi domande</h2>
+                    <button class="modal-close" type="button" aria-label="Chiudi" id="closeAddQuestionsModal">&times;</button>
                 </div>
                 <div class="modal-body">
                     <!-- Deck Selection -->
@@ -196,54 +198,56 @@
                     </div>
 
                     <!-- Tab Navigation -->
-                    <div class="tab-navigation">
-                        <button class="tab-button active" data-tab="manual">✍️ Manuale</button>
-                        <button class="tab-button" data-tab="import">📥 Importa File</button>
+                    <div class="tab-navigation" role="group" aria-label="Metodo di inserimento">
+                        <button class="tab-button active" data-tab="manual" aria-pressed="true" aria-controls="manualTab">Manuale</button>
+                        <button class="tab-button" data-tab="import" aria-pressed="false" aria-controls="importTab">Da file</button>
                     </div>
 
                     <!-- Manual Entry Tab -->
                     <div id="manualTab" class="tab-content active">
                         <form id="manualQuestionForm">
                             <div class="form-group">
-                                <label for="questionText">Domanda *</label>
-                                <textarea id="questionText" rows="3" placeholder="Inserisci la domanda..."
+                                <label for="manualQuestionText">Domanda *</label>
+                                <textarea id="manualQuestionText" rows="3" placeholder="Inserisci la domanda..."
                                     required></textarea>
                                 <small class="form-help">Puoi usare LaTeX: \( formula \) o \[ formula \]</small>
                             </div>
 
                             <div class="form-group">
-                                <label>Risposte *</label>
-                                <div class="answers-input">
-                                    <div class="answer-item">
-                                        <input type="text" id="answer0" placeholder="Risposta 1" required>
-                                        <input type="radio" name="correctAnswer" value="0" checked>
-                                        <label>Corretta</label>
+                                <fieldset class="answer-fields">
+                                    <legend>Risposte *</legend>
+                                    <div class="answers-input">
+                                        <div class="answer-item">
+                                            <input type="text" id="answer0" aria-label="Risposta 1" placeholder="Risposta 1" required>
+                                            <input type="radio" name="correctAnswer" id="correctAnswer0" value="0" checked>
+                                            <label for="correctAnswer0">Corretta</label>
+                                        </div>
+                                        <div class="answer-item">
+                                            <input type="text" id="answer1" aria-label="Risposta 2" placeholder="Risposta 2" required>
+                                            <input type="radio" name="correctAnswer" id="correctAnswer1" value="1">
+                                            <label for="correctAnswer1">Corretta</label>
+                                        </div>
+                                        <div class="answer-item">
+                                            <input type="text" id="answer2" aria-label="Risposta 3" placeholder="Risposta 3" required>
+                                            <input type="radio" name="correctAnswer" id="correctAnswer2" value="2">
+                                            <label for="correctAnswer2">Corretta</label>
+                                        </div>
+                                        <div class="answer-item">
+                                            <input type="text" id="answer3" aria-label="Risposta 4" placeholder="Risposta 4" required>
+                                            <input type="radio" name="correctAnswer" id="correctAnswer3" value="3">
+                                            <label for="correctAnswer3">Corretta</label>
+                                        </div>
                                     </div>
-                                    <div class="answer-item">
-                                        <input type="text" id="answer1" placeholder="Risposta 2" required>
-                                        <input type="radio" name="correctAnswer" value="1">
-                                        <label>Corretta</label>
-                                    </div>
-                                    <div class="answer-item">
-                                        <input type="text" id="answer2" placeholder="Risposta 3" required>
-                                        <input type="radio" name="correctAnswer" value="2">
-                                        <label>Corretta</label>
-                                    </div>
-                                    <div class="answer-item">
-                                        <input type="text" id="answer3" placeholder="Risposta 4" required>
-                                        <input type="radio" name="correctAnswer" value="3">
-                                        <label>Corretta</label>
-                                    </div>
-                                </div>
+                                </fieldset>
                             </div>
 
                             <div class="modal-actions">
                                 <button type="button" class="btn btn-secondary" id="cancelManualAdd">Annulla</button>
-                                <button type="submit" class="btn btn-primary">✅ Aggiungi Domanda</button>
+                                <button type="submit" class="btn btn-primary">Aggiungi domanda</button>
                             </div>
                         </form>
 
-                        <div id="manualAddStatus" class="import-status" style="display: none; margin-top: 1rem;"></div>
+                        <div id="manualAddStatus" class="import-status" role="status" style="display: none;"></div>
                     </div>
 
                     <!-- Import Tab -->
@@ -261,73 +265,54 @@
 
                             <div class="modal-actions">
                                 <button type="button" class="btn btn-secondary" id="cancelImportAdd">Annulla</button>
-                                <button type="submit" class="btn btn-primary">📥 Importa Domande</button>
+                                <button type="submit" class="btn btn-primary">Importa domande</button>
                             </div>
                         </form>
 
-                        <div id="importAddStatus" class="import-status" style="display: none; margin-top: 1rem;"></div>
+                        <div id="importAddStatus" class="import-status" role="status" style="display: none;"></div>
                     </div>
                 </div>
             </div>
-        </div>
+        </dialog>
 
         <!-- Code Generator Modal -->
-        <div id="codeModal" class="modal">
-            <div class="modal-content" style="max-width: 900px;">
+        <dialog id="codeModal" class="modal" aria-labelledby="codeModalTitle">
+            <div class="modal-content">
                 <div class="modal-header">
-                    <h3>Codice data.js Generato</h3>
-                    <button class="modal-close" id="closeCodeModal">&times;</button>
+                    <h2 id="codeModalTitle">Esporta data.js</h2>
+                    <button class="modal-close" type="button" aria-label="Chiudi" id="closeCodeModal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <p style="margin-bottom: 1rem; color: var(--text-secondary);">
-                        📋 <strong>Istruzioni:</strong>
-                    </p>
-                    <ol style="margin-bottom: 1.5rem; color: var(--text-secondary); line-height: 1.8;">
+                    <ol class="code-instructions">
                         <li>Copia tutto il codice qui sotto</li>
                         <li>Apri il file <code>data.js</code> del tuo progetto</li>
                         <li>Sostituisci TUTTO il contenuto con questo codice</li>
                         <li>Salva il file</li>
                         <li>Fai commit e push su GitHub:
-                            <pre
-                                style="background: var(--bg-secondary); padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem;">git add data.js
+                            <pre>git add data.js
 git commit -m "Update quiz data"
 git push</pre>
                         </li>
                         <li>Aspetta 1-2 minuti che GitHub Pages si aggiorni</li>
-                        <li>✅ Tutti vedranno i quiz su tutti i dispositivi!</li>
                     </ol>
-                    <div style="position: relative;">
-                        <button class="btn btn-primary" id="copyCodeButton"
-                            style="position: absolute; top: 0.5rem; right: 0.5rem; z-index: 10;">
-                            📋 Copia Codice
-                        </button>
-                        <textarea id="generatedCode" readonly style="
-                            width: 100%;
-                            height: 400px;
-                            background: var(--bg-secondary);
-                            color: var(--text-primary);
-                            border: 2px solid var(--bg-hover);
-                            border-radius: var(--border-radius-sm);
-                            padding: 1rem;
-                            font-family: 'Courier New', monospace;
-                            font-size: 0.875rem;
-                            resize: vertical;
-                        "></textarea>
+                    <div class="code-editor">
+                        <button class="btn btn-primary" id="copyCodeButton">Copia codice</button>
+                        <textarea id="generatedCode" aria-label="Codice per data.js" readonly></textarea>
                     </div>
                 </div>
             </div>
-        </div>
+        </dialog>
         <!-- Exam Settings Modal -->
-        <div id="examSettingsModal" class="modal">
-            <div class="modal-content" style="max-width: 600px;">
+        <dialog id="examSettingsModal" class="modal" aria-labelledby="examSettingsModalTitle">
+            <div class="modal-content">
                 <div class="modal-header">
-                    <h3>⚙️ Impostazioni Exam Mode</h3>
-                    <button class="modal-close" id="closeExamSettingsModal">&times;</button>
+                    <h2 id="examSettingsModalTitle">Impostazioni esame</h2>
+                    <button class="modal-close" type="button" aria-label="Chiudi" id="closeExamSettingsModal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.6;">
+                    <p class="exam-settings-help">
                         Imposta la percentuale di domande da prendere casualmente da ogni deck.
-                        <br><small style="color: var(--text-muted);">La somma delle percentuali deve essere
+                        <br><small>La somma delle percentuali deve essere
                             100%.</small>
                     </p>
                     <div id="examSettingsContainer" class="exam-settings-list">
@@ -335,17 +320,36 @@ git push</pre>
                     </div>
                     <div class="exam-settings-total" id="examSettingsTotal">
                         <span>Totale:</span>
-                        <span id="examTotalPercentage" class="total-value">0%</span>
+                        <span id="examTotalPercentage" class="total-value" aria-live="polite">0%</span>
                     </div>
-                    <div id="examSettingsStatus" class="import-status" style="display: none;"></div>
+                    <div id="examSettingsStatus" class="import-status" role="status" style="display: none;"></div>
                     <div class="modal-actions">
                         <button type="button" class="btn btn-secondary" id="cancelExamSettings">Annulla</button>
-                        <button type="button" class="btn btn-primary" id="saveExamSettings">💾 Salva
-                            Impostazioni</button>
+                        <button type="button" class="btn btn-primary" id="saveExamSettings">Salva</button>
                     </div>
                 </div>
             </div>
-        </div>
+        </dialog>
+        <dialog id="deckColorDialog" class="modal deck-color-dialog" aria-labelledby="deckColorTitle">
+            <form method="dialog">
+                <div class="modal-header">
+                    <h2 id="deckColorTitle">Colore del deck</h2>
+                    <button class="modal-close" type="submit" value="" aria-label="Chiudi">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="deck-color-name" id="deckColorName"></p>
+                    <div class="deck-color-options" role="group" aria-label="Colori disponibili">
+                        <button class="deck-color-option" type="submit" value="blue" data-color="blue">Blu</button>
+                        <button class="deck-color-option" type="submit" value="cyan" data-color="cyan">Ciano</button>
+                        <button class="deck-color-option" type="submit" value="purple" data-color="purple">Viola</button>
+                        <button class="deck-color-option" type="submit" value="green" data-color="green">Verde</button>
+                        <button class="deck-color-option" type="submit" value="orange" data-color="orange">Arancione</button>
+                        <button class="deck-color-option" type="submit" value="pink" data-color="pink">Rosa</button>
+                        <button class="deck-color-option" type="submit" value="none" data-color="none">Nessun colore</button>
+                    </div>
+                </div>
+            </form>
+        </dialog>
     </div>
 
     <!-- Include MathJax for LaTeX rendering -->

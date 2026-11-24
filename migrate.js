@@ -4,8 +4,7 @@ const startBtn = document.getElementById('startBtn');
 function log(msg, type = 'info') {
     const div = document.createElement('div');
     div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-    if (type === 'error') div.style.color = 'red';
-    if (type === 'success') div.style.color = 'green';
+    div.className = type;
     logDiv.appendChild(div);
     logDiv.scrollTop = logDiv.scrollHeight;
 }
